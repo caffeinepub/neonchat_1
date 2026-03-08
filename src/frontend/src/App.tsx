@@ -70,6 +70,24 @@ export default function App() {
     return () => clearInterval(interval);
   }, [screen, actor, userId]);
 
+  // Poll isKicked every 5s while in chat — force logout if kicked by admin
+  useEffect(() => {
+    if (screen !== "chat" || !actor || !userId) return;
+    const checkKicked = async () => {
+      try {
+        const kicked = await actor.isKicked(userId);
+        if (kicked) {
+          handleLogout();
+        }
+      } catch {
+        // silent
+      }
+    };
+    const interval = setInterval(checkKicked, 5_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, actor, userId]);
+
   const handleCodeAccepted = () => {
     setScreen("name");
   };
@@ -77,8 +95,8 @@ export default function App() {
   const handleNameConfirmed = async (id: string, name: string) => {
     setUserId(id);
     setUserName(name);
-    // NEXUS auto-gets Admin; others start as Friend until backend confirms
-    const initialRank = name === "NEXUS" ? "Admin" : "Friend";
+    // PhillyNEXUS auto-gets Admin; others start as Friend until backend confirms
+    const initialRank = name === "PhillyNEXUS" ? "Admin" : "Friend";
     setUserRank(initialRank);
     sessionStorage.setItem("userId", id);
     sessionStorage.setItem("userName", name);

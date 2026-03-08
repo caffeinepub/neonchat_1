@@ -146,9 +146,12 @@ export interface backendInterface {
     getSplash(): Promise<string>;
     getUserRank(userId: string): Promise<string>;
     getUsers(): Promise<Array<User>>;
+    isKicked(userId: string): Promise<boolean>;
+    kickUser(adminUserId: string, targetUserId: string): Promise<boolean>;
     registerUser(name: string): Promise<string>;
     sendDM(fromUserId: string, toUserId: string, text: string): Promise<bigint>;
     sendMessage(userId: string, text: string, replyToId: bigint | null, replyToText: string | null): Promise<bigint>;
+    setAccessCode(adminUserId: string, code: string): Promise<boolean>;
     setSplash(adminUserId: string, text: string): Promise<boolean>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
     updateLastSeen(userId: string): Promise<void>;
@@ -315,6 +318,34 @@ export class Backend implements backendInterface {
             return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
         }
     }
+    async isKicked(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isKicked(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.isKicked(arg0);
+            return result;
+        }
+    }
+    async kickUser(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.kickUser(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.kickUser(arg0, arg1);
+            return result;
+        }
+    }
     async registerUser(arg0: string): Promise<string> {
         if (this.processError) {
             try {
@@ -354,6 +385,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.sendMessage(arg0, arg1, to_candid_opt_n13(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n14(this._uploadFile, this._downloadFile, arg3));
+            return result;
+        }
+    }
+    async setAccessCode(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setAccessCode(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setAccessCode(arg0, arg1);
             return result;
         }
     }

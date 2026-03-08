@@ -8,8 +8,8 @@ import Int "mo:core/Int";
 import Order "mo:core/Order";
 import Iter "mo:core/Iter";
 import Runtime "mo:core/Runtime";
-import OutCall "http-outcalls/outcall";
 
+import OutCall "http-outcalls/outcall";
 
 
 actor {
@@ -76,6 +76,7 @@ actor {
   let directMessages = Map.empty<Text, List.List<Message>>();
   let bans = Map.empty<Text, BanRecord>();
 
+  var accessCode = "1017";
   var splash : Text = "";
 
   let verificationArray = [
@@ -85,11 +86,15 @@ actor {
   ];
 
   public func verifyCode(code : Text) : async Bool {
-    for ((_, validCode) in verificationArray.values()) {
-      if (validCode == code) {
-        return true;
-      };
-    };
+    // Check array codes first
+    let arrayMatch = verificationArray.find(
+      func(pair) { code == pair.1 }
+    );
+    if (arrayMatch != null) { return true };
+
+    // Check dynamic access code
+    if (code == accessCode) { return true };
+
     false;
   };
 
@@ -157,6 +162,21 @@ actor {
         switch (adminUser.rank) {
           case (#Admin) {
             splash := text;
+            true;
+          };
+          case (_) { false };
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func setAccessCode(adminUserId : Text, code : Text) : async Bool {
+    switch (users.get(adminUserId)) {
+      case (null) { false };
+      case (?adminUser) {
+        switch (adminUser.rank) {
+          case (#Admin) {
+            accessCode := code;
             true;
           };
           case (_) { false };
@@ -372,7 +392,6 @@ actor {
             let initialSize = publicMessages.size();
             if (initialSize == 0) { return false };
 
-            // Remove matching messages
             let filteredMessages = publicMessages.filter(
               func(msg) { msg.id != messageId }
             );
@@ -381,7 +400,6 @@ actor {
             publicMessages.clear();
             publicMessages.addAll(filteredMessages.reverseValues());
 
-            // If the filtered list has fewer messages, a message was deleted.
             filteredSize < initialSize;
           };
           case (_) { false };
@@ -389,5 +407,28 @@ actor {
       };
     };
   };
-};
 
+  // NEW FEATURES
+  public shared ({ caller }) func kickUser(adminUserId : Text, targetUserId : Text) : async Bool {
+    switch (users.get(adminUserId)) {
+      case (null) { false };
+      case (?adminUser) {
+        switch (adminUser.rank) {
+          case (#Admin) {
+            if (users.containsKey(targetUserId)) {
+              users.remove(targetUserId);
+              return true;
+            } else {
+              return false;
+            };
+          };
+          case (_) { false };
+        };
+      };
+    };
+  };
+
+  public query ({ caller }) func isKicked(userId : Text) : async Bool {
+    not users.containsKey(userId);
+  };
+};

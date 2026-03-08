@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-const ADMIN_PASSWORD = "NEXUS";
+const PHILLYNEXUS_PASSWORD = "NEXUSRULES";
 
 interface NamePickerScreenProps {
   onNameConfirmed: (userId: string, userName: string) => void;
@@ -19,7 +19,7 @@ export function NamePickerScreen({ onNameConfirmed }: NamePickerScreenProps) {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  const requiresPassword = name.trim() === "NEXUS";
+  const requiresPassword = name.trim() === "PhillyNEXUS";
 
   useEffect(() => {
     nameInputRef.current?.focus();
@@ -37,9 +37,9 @@ export function NamePickerScreen({ onNameConfirmed }: NamePickerScreenProps) {
     const trimmed = name.trim();
     if (!trimmed || trimmed.length < 2 || !actor) return;
 
-    // Password gate for "admin"
+    // Password gate for "PhillyNEXUS"
     if (requiresPassword) {
-      if (password !== ADMIN_PASSWORD) {
+      if (password !== PHILLYNEXUS_PASSWORD) {
         setPasswordError(true);
         toast.error("Access denied. Invalid admin password.");
         return;

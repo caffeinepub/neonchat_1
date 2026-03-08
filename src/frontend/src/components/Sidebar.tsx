@@ -95,10 +95,18 @@ export function Sidebar({
   const [banReason, setBanReason] = useState("");
   const [isBanning, setIsBanning] = useState(false);
 
+  // Admin kick state
+  const [kickTargetId, setKickTargetId] = useState("");
+  const [isKicking, setIsKicking] = useState(false);
+
   // Splash edit state
   const [splashText, setSplashText] = useState("");
   const [isSavingSplash, setIsSavingSplash] = useState(false);
   const [isLoadingSplash, setIsLoadingSplash] = useState(false);
+
+  // Change access code state
+  const [newAccessCode, setNewAccessCode] = useState("");
+  const [isSavingCode, setIsSavingCode] = useState(false);
 
   const aiMsgCounter = useRef(0);
   const dmEndRef = useRef<HTMLDivElement>(null);
@@ -296,6 +304,45 @@ export function Sidebar({
       toast.error("Error saving announcement");
     } finally {
       setIsSavingSplash(false);
+    }
+  };
+
+  const handleKickUser = async () => {
+    if (!actor || !kickTargetId || isKicking) return;
+    setIsKicking(true);
+    try {
+      const success = await actor.kickUser(userId, kickTargetId);
+      if (success) {
+        toast.success("User kicked");
+        setKickTargetId("");
+        const list = await actor.getUsers();
+        setUsers(list.filter((u) => u.id !== userId));
+      } else {
+        toast.error("Failed to kick user");
+      }
+    } catch {
+      toast.error("Failed to kick user");
+    } finally {
+      setIsKicking(false);
+    }
+  };
+
+  const handleSaveCode = async () => {
+    const code = newAccessCode.trim();
+    if (!actor || !code || isSavingCode) return;
+    setIsSavingCode(true);
+    try {
+      const success = await actor.setAccessCode(userId, code);
+      if (success) {
+        toast.success("Access code updated");
+        setNewAccessCode("");
+      } else {
+        toast.error("Failed to update access code");
+      }
+    } catch {
+      toast.error("Failed to update access code");
+    } finally {
+      setIsSavingCode(false);
     }
   };
 
@@ -505,7 +552,7 @@ export function Sidebar({
                       className="font-mono text-xs"
                       style={{ color: "oklch(0.85 0.19 80 / 0.45)" }}
                     >
-                      Ban users · Manage announcements
+                      Ban · Kick · Manage announcements
                     </div>
                   </div>
                 </button>
@@ -1064,6 +1111,87 @@ export function Sidebar({
                 }}
               />
 
+              {/* ── Kick User section ── */}
+              <section>
+                <div
+                  className="flex items-center gap-2 mb-3 pb-2 border-b"
+                  style={{ borderColor: "oklch(0.62 0.24 25 / 0.2)" }}
+                >
+                  <ShieldAlert
+                    className="w-4 h-4"
+                    style={{ color: "oklch(0.72 0.24 25 / 0.8)" }}
+                  />
+                  <span
+                    className="font-mono text-xs font-semibold tracking-widest uppercase"
+                    style={{ color: "oklch(0.72 0.24 25 / 0.8)" }}
+                  >
+                    Kick User
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label
+                      htmlFor="kick-user-select"
+                      className="font-mono text-xs mb-1 block"
+                      style={{ color: "oklch(0.65 0.08 210 / 0.7)" }}
+                    >
+                      Select user
+                    </label>
+                    <select
+                      id="kick-user-select"
+                      data-ocid="admin.kick.select"
+                      value={kickTargetId}
+                      onChange={(e) => setKickTargetId(e.target.value)}
+                      className="w-full font-mono text-xs px-3 py-2 rounded-sm outline-none"
+                      style={{
+                        background: "oklch(0.14 0.025 242)",
+                        border: "1px solid oklch(0.62 0.24 25 / 0.25)",
+                        color: kickTargetId
+                          ? "oklch(0.92 0.04 200)"
+                          : "oklch(0.55 0.07 210 / 0.5)",
+                      }}
+                    >
+                      <option value="">-- Choose user --</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    data-ocid="admin.kick.submit_button"
+                    onClick={handleKickUser}
+                    disabled={isKicking || !kickTargetId}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-sm font-mono text-xs tracking-widest uppercase transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{
+                      background: "oklch(0.62 0.24 25 / 0.12)",
+                      border: "1px solid oklch(0.62 0.24 25 / 0.4)",
+                      color: "oklch(0.72 0.24 25)",
+                    }}
+                  >
+                    {isKicking ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                    )}
+                    {isKicking ? "Kicking..." : "Kick User"}
+                  </button>
+                </div>
+              </section>
+
+              {/* Divider */}
+              <div
+                className="w-full h-px"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent, oklch(0.82 0.2 196 / 0.15), transparent)",
+                }}
+              />
+
               {/* ── Edit Announcement section ── */}
               <section>
                 <div
@@ -1140,6 +1268,80 @@ export function Sidebar({
                       </button>
                     </>
                   )}
+                </div>
+              </section>
+
+              {/* Divider */}
+              <div
+                className="w-full h-px"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent, oklch(0.82 0.2 196 / 0.15), transparent)",
+                }}
+              />
+
+              {/* ── Change Access Code section ── */}
+              <section>
+                <div
+                  className="flex items-center gap-2 mb-3 pb-2 border-b"
+                  style={{ borderColor: "oklch(0.82 0.2 196 / 0.15)" }}
+                >
+                  <Shield
+                    className="w-4 h-4"
+                    style={{ color: "oklch(0.82 0.2 196 / 0.7)" }}
+                  />
+                  <span
+                    className="font-mono text-xs font-semibold tracking-widest uppercase"
+                    style={{ color: "oklch(0.82 0.2 196 / 0.7)" }}
+                  >
+                    Change Access Code
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label
+                      htmlFor="access-code-input"
+                      className="font-mono text-xs mb-1 block"
+                      style={{ color: "oklch(0.65 0.08 210 / 0.7)" }}
+                    >
+                      New access code
+                    </label>
+                    <input
+                      id="access-code-input"
+                      data-ocid="admin.code.input"
+                      type="text"
+                      value={newAccessCode}
+                      onChange={(e) => setNewAccessCode(e.target.value)}
+                      placeholder="Enter new code..."
+                      className="w-full font-mono text-xs px-3 py-2 rounded-sm outline-none placeholder:opacity-40"
+                      style={{
+                        background: "oklch(0.14 0.025 242)",
+                        border: "1px solid oklch(0.82 0.2 196 / 0.2)",
+                        color: "oklch(0.92 0.04 200)",
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    data-ocid="admin.code.submit_button"
+                    onClick={handleSaveCode}
+                    disabled={isSavingCode || !newAccessCode.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-sm font-mono text-xs tracking-widest uppercase transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{
+                      background: "oklch(0.82 0.2 196 / 0.1)",
+                      border: "1px solid oklch(0.82 0.2 196 / 0.35)",
+                      color: "oklch(0.82 0.2 196)",
+                    }}
+                  >
+                    {isSavingCode ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Shield className="w-3.5 h-3.5" />
+                    )}
+                    {isSavingCode ? "Saving..." : "Save Code"}
+                  </button>
                 </div>
               </section>
             </div>

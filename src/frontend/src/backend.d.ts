@@ -64,9 +64,12 @@ export interface backendInterface {
     getSplash(): Promise<string>;
     getUserRank(userId: string): Promise<string>;
     getUsers(): Promise<Array<User>>;
+    isKicked(userId: string): Promise<boolean>;
+    kickUser(adminUserId: string, targetUserId: string): Promise<boolean>;
     registerUser(name: string): Promise<string>;
     sendDM(fromUserId: string, toUserId: string, text: string): Promise<bigint>;
     sendMessage(userId: string, text: string, replyToId: bigint | null, replyToText: string | null): Promise<bigint>;
+    setAccessCode(adminUserId: string, code: string): Promise<boolean>;
     setSplash(adminUserId: string, text: string): Promise<boolean>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
     updateLastSeen(userId: string): Promise<void>;

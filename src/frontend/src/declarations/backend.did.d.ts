@@ -61,12 +61,15 @@ export interface _SERVICE {
   'getSplash' : ActorMethod<[], string>,
   'getUserRank' : ActorMethod<[string], string>,
   'getUsers' : ActorMethod<[], Array<User>>,
+  'isKicked' : ActorMethod<[string], boolean>,
+  'kickUser' : ActorMethod<[string, string], boolean>,
   'registerUser' : ActorMethod<[string], string>,
   'sendDM' : ActorMethod<[string, string, string], bigint>,
   'sendMessage' : ActorMethod<
     [string, string, [] | [bigint], [] | [string]],
     bigint
   >,
+  'setAccessCode' : ActorMethod<[string, string], boolean>,
   'setSplash' : ActorMethod<[string, string], boolean>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
   'updateLastSeen' : ActorMethod<[string], undefined>,

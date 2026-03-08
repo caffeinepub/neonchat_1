@@ -133,13 +133,13 @@ export function CodeGateScreen({ onCodeAccepted }: CodeGateScreenProps) {
           transition={{ delay: 0.1, duration: 0.6, ease: "easeOut" }}
         >
           <div className="font-mono text-xs tracking-[0.4em] text-neon-cyan/60 mb-3 uppercase">
-            Secure Channel
+            Welcome To
           </div>
           <h1
             className="font-display font-black text-5xl sm:text-6xl tracking-tight neon-cyan cursor-blink"
             style={{ letterSpacing: "-0.02em" }}
           >
-            NEXUS
+            PhillyNEXUS
           </h1>
           <div className="font-mono text-xs tracking-[0.3em] text-neon-magenta/70 mt-2 uppercase">
             Real-Time Chat Protocol
@@ -283,7 +283,7 @@ export function CodeGateScreen({ onCodeAccepted }: CodeGateScreenProps) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
-          [ NEXUS SECURE PROTOCOL v2.4.1 ]
+          [ PhillyNEXUS SECURE PROTOCOL v2.4.1 ]
         </motion.div>
       </div>
     </motion.div>

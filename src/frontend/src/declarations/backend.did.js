@@ -72,6 +72,8 @@ export const idlService = IDL.Service({
   'getSplash' : IDL.Func([], [IDL.Text], ['query']),
   'getUserRank' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
   'getUsers' : IDL.Func([], [IDL.Vec(User)], ['query']),
+  'isKicked' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+  'kickUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
   'registerUser' : IDL.Func([IDL.Text], [IDL.Text], []),
   'sendDM' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
   'sendMessage' : IDL.Func(
@@ -79,6 +81,7 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'setAccessCode' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
   'setSplash' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
   'transform' : IDL.Func(
       [TransformationInput],
@@ -157,6 +160,8 @@ export const idlFactory = ({ IDL }) => {
     'getSplash' : IDL.Func([], [IDL.Text], ['query']),
     'getUserRank' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'getUsers' : IDL.Func([], [IDL.Vec(User)], ['query']),
+    'isKicked' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+    'kickUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
     'registerUser' : IDL.Func([IDL.Text], [IDL.Text], []),
     'sendDM' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
     'sendMessage' : IDL.Func(
@@ -164,6 +169,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'setAccessCode' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
     'setSplash' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
     'transform' : IDL.Func(
         [TransformationInput],
