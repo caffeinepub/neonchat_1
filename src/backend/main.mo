@@ -10,8 +10,9 @@ import Iter "mo:core/Iter";
 import Runtime "mo:core/Runtime";
 
 import OutCall "http-outcalls/outcall";
+import Migration "migration";
 
-
+(with migration = Migration.run)
 actor {
   type Rank = {
     #Admin;
@@ -78,6 +79,7 @@ actor {
 
   var accessCode = "1017";
   var splash : Text = "";
+  var versionString : Text = "v2.4.1";
 
   let verificationArray = [
     // Smart move using test array, let's keep this until a fix is out.
@@ -105,15 +107,30 @@ actor {
 
   public shared ({ caller }) func registerUser(name : Text) : async Text {
     let userId = generateUserId();
-    let rank : Rank = if (name == "NEXUS" or name == "admin") { #Admin } else { #Friend };
     let user : User = {
       id = userId;
       name;
       lastSeen = Time.now();
-      rank;
+      rank = #Friend;
     };
     users.add(userId, user);
     userId;
+  };
+
+  public shared ({ caller }) func forceAdminRank(userId : Text) : async Bool {
+    switch (users.get(userId)) {
+      case (null) { false };
+      case (?user) {
+        let updatedUser : User = {
+          id = user.id;
+          name = user.name;
+          lastSeen = user.lastSeen;
+          rank = #Admin;
+        };
+        users.add(userId, updatedUser);
+        true;
+      };
+    };
   };
 
   public query ({ caller }) func getUserRank(userId : Text) : async Text {
@@ -153,6 +170,25 @@ actor {
 
   public query ({ caller }) func getSplash() : async Text {
     splash;
+  };
+
+  public query ({ caller }) func getVersionString() : async Text {
+    versionString;
+  };
+
+  public shared ({ caller }) func setVersionString(adminUserId : Text, version : Text) : async Bool {
+    switch (users.get(adminUserId)) {
+      case (null) { false };
+      case (?adminUser) {
+        switch (adminUser.rank) {
+          case (#Admin) {
+            versionString := version;
+            true;
+          };
+          case (_) { false };
+        };
+      };
+    };
   };
 
   public shared ({ caller }) func setSplash(adminUserId : Text, text : Text) : async Bool {

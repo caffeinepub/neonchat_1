@@ -41,8 +41,9 @@ export default function App() {
   }, []);
 
   // Fetch rank from backend when actor is ready and user is logged in
+  // Skip for PhillyNEXUS — rank is authoritatively set at login via forceAdminRank
   useEffect(() => {
-    if (!actor || !userId) return;
+    if (!actor || !userId || userName === "PhillyNEXUS") return;
     actor
       .getUserRank(userId)
       .then((rank) => {
@@ -50,7 +51,7 @@ export default function App() {
         sessionStorage.setItem("userRank", rank);
       })
       .catch(() => {});
-  }, [actor, userId]);
+  }, [actor, userId, userName]);
 
   // Periodic ban check every 30s while in chat
   useEffect(() => {
@@ -101,6 +102,15 @@ export default function App() {
     sessionStorage.setItem("userId", id);
     sessionStorage.setItem("userName", name);
     sessionStorage.setItem("userRank", initialRank);
+
+    // Force Admin rank to backend for PhillyNEXUS before getUserRank can fire
+    if (name === "PhillyNEXUS" && actor) {
+      try {
+        await actor.forceAdminRank(id);
+      } catch {
+        /* silent */
+      }
+    }
 
     // Check ban before entering chat
     if (actor) {

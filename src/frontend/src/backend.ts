@@ -141,11 +141,13 @@ export interface backendInterface {
     }>;
     deleteMessage(adminUserId: string, messageId: bigint): Promise<boolean>;
     editMessage(adminUserId: string, messageId: bigint, newText: string): Promise<boolean>;
+    forceAdminRank(userId: string): Promise<boolean>;
     getDMs(userId: string, _otherUserId: string): Promise<Array<Message>>;
     getMessages(since: bigint): Promise<Array<Message>>;
     getSplash(): Promise<string>;
     getUserRank(userId: string): Promise<string>;
     getUsers(): Promise<Array<User>>;
+    getVersionString(): Promise<string>;
     isKicked(userId: string): Promise<boolean>;
     kickUser(adminUserId: string, targetUserId: string): Promise<boolean>;
     registerUser(name: string): Promise<string>;
@@ -153,6 +155,7 @@ export interface backendInterface {
     sendMessage(userId: string, text: string, replyToId: bigint | null, replyToText: string | null): Promise<bigint>;
     setAccessCode(adminUserId: string, code: string): Promise<boolean>;
     setSplash(adminUserId: string, text: string): Promise<boolean>;
+    setVersionString(adminUserId: string, version: string): Promise<boolean>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
     updateLastSeen(userId: string): Promise<void>;
     verifyCode(code: string): Promise<boolean>;
@@ -248,6 +251,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async forceAdminRank(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.forceAdminRank(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.forceAdminRank(arg0);
+            return result;
+        }
+    }
     async getDMs(arg0: string, arg1: string): Promise<Array<Message>> {
         if (this.processError) {
             try {
@@ -316,6 +333,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getUsers();
             return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getVersionString(): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getVersionString();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getVersionString();
+            return result;
         }
     }
     async isKicked(arg0: string): Promise<boolean> {
@@ -413,6 +444,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.setSplash(arg0, arg1);
+            return result;
+        }
+    }
+    async setVersionString(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setVersionString(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setVersionString(arg0, arg1);
             return result;
         }
     }

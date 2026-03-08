@@ -16,12 +16,23 @@ export function CodeGateScreen({ onCodeAccepted }: CodeGateScreenProps) {
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [success, setSuccess] = useState(false);
+  const [version, setVersion] = useState("v2.4.1");
   const inputRef = useRef<HTMLInputElement>(null);
   const { actor } = useActor();
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!actor) return;
+    actor
+      .getVersionString()
+      .then((v) => {
+        if (v) setVersion(v);
+      })
+      .catch(() => {});
+  }, [actor]);
 
   const handleVerify = useCallback(
     async (code: string) => {
@@ -283,7 +294,7 @@ export function CodeGateScreen({ onCodeAccepted }: CodeGateScreenProps) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
-          [ PhillyNEXUS SECURE PROTOCOL v2.4.1 ]
+          [ PhillyNEXUS SECURE PROTOCOL {version} ]
         </motion.div>
       </div>
     </motion.div>

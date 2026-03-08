@@ -59,11 +59,13 @@ export interface backendInterface {
     }>;
     deleteMessage(adminUserId: string, messageId: bigint): Promise<boolean>;
     editMessage(adminUserId: string, messageId: bigint, newText: string): Promise<boolean>;
+    forceAdminRank(userId: string): Promise<boolean>;
     getDMs(userId: string, _otherUserId: string): Promise<Array<Message>>;
     getMessages(since: bigint): Promise<Array<Message>>;
     getSplash(): Promise<string>;
     getUserRank(userId: string): Promise<string>;
     getUsers(): Promise<Array<User>>;
+    getVersionString(): Promise<string>;
     isKicked(userId: string): Promise<boolean>;
     kickUser(adminUserId: string, targetUserId: string): Promise<boolean>;
     registerUser(name: string): Promise<string>;
@@ -71,6 +73,7 @@ export interface backendInterface {
     sendMessage(userId: string, text: string, replyToId: bigint | null, replyToText: string | null): Promise<bigint>;
     setAccessCode(adminUserId: string, code: string): Promise<boolean>;
     setSplash(adminUserId: string, text: string): Promise<boolean>;
+    setVersionString(adminUserId: string, version: string): Promise<boolean>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
     updateLastSeen(userId: string): Promise<void>;
     verifyCode(code: string): Promise<boolean>;

@@ -108,6 +108,10 @@ export function Sidebar({
   const [newAccessCode, setNewAccessCode] = useState("");
   const [isSavingCode, setIsSavingCode] = useState(false);
 
+  // Version string state
+  const [versionStr, setVersionStr] = useState("");
+  const [isSavingVersion, setIsSavingVersion] = useState(false);
+
   const aiMsgCounter = useRef(0);
   const dmEndRef = useRef<HTMLDivElement>(null);
   const aiEndRef = useRef<HTMLDivElement>(null);
@@ -148,12 +152,14 @@ export function Sidebar({
     const fetchAll = async () => {
       setIsLoadingSplash(true);
       try {
-        const [list, splash] = await Promise.all([
+        const [list, splash, version] = await Promise.all([
           actor.getUsers(),
           actor.getSplash(),
+          actor.getVersionString(),
         ]);
         setUsers(list.filter((u) => u.id !== userId));
         setSplashText(splash);
+        setVersionStr(version);
       } catch {
         // silent
       } finally {
@@ -343,6 +349,24 @@ export function Sidebar({
       toast.error("Failed to update access code");
     } finally {
       setIsSavingCode(false);
+    }
+  };
+
+  const handleSaveVersion = async () => {
+    const ver = versionStr.trim();
+    if (!actor || !ver || isSavingVersion) return;
+    setIsSavingVersion(true);
+    try {
+      const success = await actor.setVersionString(userId, ver);
+      if (success) {
+        toast.success("Version updated");
+      } else {
+        toast.error("Failed to update version");
+      }
+    } catch {
+      toast.error("Failed to update version");
+    } finally {
+      setIsSavingVersion(false);
     }
   };
 
@@ -1341,6 +1365,80 @@ export function Sidebar({
                       <Shield className="w-3.5 h-3.5" />
                     )}
                     {isSavingCode ? "Saving..." : "Save Code"}
+                  </button>
+                </div>
+              </section>
+
+              {/* Divider */}
+              <div
+                className="w-full h-px"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent, oklch(0.82 0.2 196 / 0.15), transparent)",
+                }}
+              />
+
+              {/* ── Version String section ── */}
+              <section>
+                <div
+                  className="flex items-center gap-2 mb-3 pb-2 border-b"
+                  style={{ borderColor: "oklch(0.82 0.2 196 / 0.15)" }}
+                >
+                  <Shield
+                    className="w-4 h-4"
+                    style={{ color: "oklch(0.82 0.2 196 / 0.7)" }}
+                  />
+                  <span
+                    className="font-mono text-xs font-semibold tracking-widest uppercase"
+                    style={{ color: "oklch(0.82 0.2 196 / 0.7)" }}
+                  >
+                    Version String
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label
+                      htmlFor="version-string-input"
+                      className="font-mono text-xs mb-1 block"
+                      style={{ color: "oklch(0.65 0.08 210 / 0.7)" }}
+                    >
+                      Version string
+                    </label>
+                    <input
+                      id="version-string-input"
+                      data-ocid="admin.version.input"
+                      type="text"
+                      value={versionStr}
+                      onChange={(e) => setVersionStr(e.target.value)}
+                      placeholder="e.g. v2.4.1"
+                      className="w-full font-mono text-xs px-3 py-2 rounded-sm outline-none placeholder:opacity-40"
+                      style={{
+                        background: "oklch(0.14 0.025 242)",
+                        border: "1px solid oklch(0.82 0.2 196 / 0.2)",
+                        color: "oklch(0.92 0.04 200)",
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    data-ocid="admin.version.submit_button"
+                    onClick={handleSaveVersion}
+                    disabled={isSavingVersion || !versionStr.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-sm font-mono text-xs tracking-widest uppercase transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{
+                      background: "oklch(0.82 0.2 196 / 0.1)",
+                      border: "1px solid oklch(0.82 0.2 196 / 0.35)",
+                      color: "oklch(0.82 0.2 196)",
+                    }}
+                  >
+                    {isSavingVersion ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Shield className="w-3.5 h-3.5" />
+                    )}
+                    {isSavingVersion ? "Saving..." : "Save Version"}
                   </button>
                 </div>
               </section>
