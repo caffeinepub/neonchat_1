@@ -12,13 +12,17 @@ import type { Principal } from '@icp-sdk/core/principal';
 
 export interface Message {
   'id' : bigint,
+  'replyToText' : [] | [string],
   'userName' : string,
   'userRank' : string,
+  'edited' : boolean,
   'userId' : string,
   'text' : string,
   'timestamp' : bigint,
+  'replyToId' : [] | [bigint],
 }
-export type Rank = { 'Employee' : null } |
+export type Rank = { 'VIP' : null } |
+  { 'Employee' : null } |
   { 'Admin' : null } |
   { 'Friend' : null };
 export interface TransformationInput {
@@ -45,13 +49,25 @@ export interface http_request_result {
 export interface _SERVICE {
   'askAI' : ActorMethod<[string], string>,
   'assignRank' : ActorMethod<[string, string, Rank], boolean>,
+  'banUser' : ActorMethod<[string, string, bigint, string], boolean>,
+  'checkBan' : ActorMethod<
+    [string],
+    { 'expiresAt' : bigint, 'banned' : boolean, 'reason' : string }
+  >,
+  'deleteMessage' : ActorMethod<[string, bigint], boolean>,
+  'editMessage' : ActorMethod<[string, bigint, string], boolean>,
   'getDMs' : ActorMethod<[string, string], Array<Message>>,
   'getMessages' : ActorMethod<[bigint], Array<Message>>,
+  'getSplash' : ActorMethod<[], string>,
   'getUserRank' : ActorMethod<[string], string>,
   'getUsers' : ActorMethod<[], Array<User>>,
   'registerUser' : ActorMethod<[string], string>,
   'sendDM' : ActorMethod<[string, string, string], bigint>,
-  'sendMessage' : ActorMethod<[string, string], bigint>,
+  'sendMessage' : ActorMethod<
+    [string, string, [] | [bigint], [] | [string]],
+    bigint
+  >,
+  'setSplash' : ActorMethod<[string, string], boolean>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
   'updateLastSeen' : ActorMethod<[string], undefined>,
   'verifyCode' : ActorMethod<[string], boolean>,

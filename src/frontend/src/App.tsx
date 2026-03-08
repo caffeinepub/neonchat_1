@@ -1,17 +1,30 @@
 import { Toaster } from "@/components/ui/sonner";
 import { useActor } from "@/hooks/useActor";
+import { AnimatePresence } from "motion/react";
 import { useEffect, useState } from "react";
+import { BannedScreen } from "./components/BannedScreen";
 import { ChatScreen } from "./components/ChatScreen";
 import { CodeGateScreen } from "./components/CodeGateScreen";
+import { LoginSweep } from "./components/LoginSweep";
 import { NamePickerScreen } from "./components/NamePickerScreen";
+import { SplashModal } from "./components/SplashModal";
 
-type Screen = "code" | "name" | "chat";
+type Screen = "code" | "name" | "chat" | "banned";
+
+interface BanInfo {
+  expiresAt: bigint;
+  reason: string;
+}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("code");
   const [userId, setUserId] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
   const [userRank, setUserRank] = useState<string>("Friend");
+  const [showSweep, setShowSweep] = useState(false);
+  const [showSplash, setShowSplash] = useState(false);
+  const [splashText, setSplashText] = useState("");
+  const [banInfo, setBanInfo] = useState<BanInfo | null>(null);
   const { actor } = useActor();
 
   // Restore session from sessionStorage
@@ -39,11 +52,29 @@ export default function App() {
       .catch(() => {});
   }, [actor, userId]);
 
+  // Periodic ban check every 30s while in chat
+  useEffect(() => {
+    if (screen !== "chat" || !actor || !userId) return;
+    const checkBan = async () => {
+      try {
+        const result = await actor.checkBan(userId);
+        if (result.banned) {
+          setBanInfo({ expiresAt: result.expiresAt, reason: result.reason });
+          setScreen("banned");
+        }
+      } catch {
+        // silent
+      }
+    };
+    const interval = setInterval(checkBan, 30_000);
+    return () => clearInterval(interval);
+  }, [screen, actor, userId]);
+
   const handleCodeAccepted = () => {
     setScreen("name");
   };
 
-  const handleNameConfirmed = (id: string, name: string) => {
+  const handleNameConfirmed = async (id: string, name: string) => {
     setUserId(id);
     setUserName(name);
     // NEXUS auto-gets Admin; others start as Friend until backend confirms
@@ -52,7 +83,56 @@ export default function App() {
     sessionStorage.setItem("userId", id);
     sessionStorage.setItem("userName", name);
     sessionStorage.setItem("userRank", initialRank);
+
+    // Check ban before entering chat
+    if (actor) {
+      try {
+        const result = await actor.checkBan(id);
+        if (result.banned) {
+          setBanInfo({ expiresAt: result.expiresAt, reason: result.reason });
+          setScreen("banned");
+          return;
+        }
+      } catch {
+        // silent — if check fails, allow into chat
+      }
+
+      // Fetch and show splash
+      try {
+        const splash = await actor.getSplash();
+        setSplashText(splash);
+      } catch {
+        setSplashText("");
+      }
+    }
+
     setScreen("chat");
+    // Play the sweep animation first; splash fires in onSweepComplete
+    setShowSweep(true);
+  };
+
+  const handleSweepComplete = () => {
+    setShowSweep(false);
+    setShowSplash(true);
+  };
+
+  const handleTryAgainAfterBan = async () => {
+    if (!actor || !userId) return;
+    try {
+      const result = await actor.checkBan(userId);
+      if (result.banned) {
+        setBanInfo({ expiresAt: result.expiresAt, reason: result.reason });
+        // Stay on banned screen
+      } else {
+        setBanInfo(null);
+        setScreen("chat");
+        setShowSweep(true);
+      }
+    } catch {
+      // If check fails, let them back in
+      setBanInfo(null);
+      setScreen("chat");
+    }
   };
 
   const handleLogout = () => {
@@ -62,6 +142,9 @@ export default function App() {
     setUserId("");
     setUserName("");
     setUserRank("Friend");
+    setBanInfo(null);
+    setShowSweep(false);
+    setShowSplash(false);
     setScreen("code");
   };
 
@@ -87,6 +170,30 @@ export default function App() {
           onLogout={handleLogout}
         />
       )}
+      {screen === "banned" && banInfo && (
+        <BannedScreen
+          reason={banInfo.reason}
+          expiresAt={banInfo.expiresAt}
+          onTryAgain={handleTryAgainAfterBan}
+        />
+      )}
+
+      {/* Corner-to-corner login sweep */}
+      <AnimatePresence>
+        {showSweep && (
+          <LoginSweep key="login-sweep" onComplete={handleSweepComplete} />
+        )}
+      </AnimatePresence>
+
+      {/* Splash modal overlay */}
+      <AnimatePresence>
+        {showSplash && screen === "chat" && (
+          <SplashModal
+            splashText={splashText}
+            onClose={() => setShowSplash(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <Toaster
         theme="dark"

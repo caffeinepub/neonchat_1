@@ -14,6 +14,13 @@ const RANK_CONFIG: Record<
     border: "oklch(0.85 0.19 80 / 0.4)",
     glow: "0 0 8px oklch(0.85 0.19 80 / 0.35)",
   },
+  VIP: {
+    label: "VIP",
+    color: "oklch(0.88 0.18 55)",
+    bg: "oklch(0.88 0.18 55 / 0.12)",
+    border: "oklch(0.88 0.18 55 / 0.45)",
+    glow: "0 0 8px oklch(0.88 0.18 55 / 0.4)",
+  },
   Employee: {
     label: "EMPLOYEE",
     color: "oklch(0.82 0.2 196)",

@@ -9,17 +9,21 @@
 import { IDL } from '@icp-sdk/core/candid';
 
 export const Rank = IDL.Variant({
+  'VIP' : IDL.Null,
   'Employee' : IDL.Null,
   'Admin' : IDL.Null,
   'Friend' : IDL.Null,
 });
 export const Message = IDL.Record({
   'id' : IDL.Nat,
+  'replyToText' : IDL.Opt(IDL.Text),
   'userName' : IDL.Text,
   'userRank' : IDL.Text,
+  'edited' : IDL.Bool,
   'userId' : IDL.Text,
   'text' : IDL.Text,
   'timestamp' : IDL.Int,
+  'replyToId' : IDL.Opt(IDL.Nat),
 });
 export const User = IDL.Record({
   'id' : IDL.Text,
@@ -49,13 +53,33 @@ export const TransformationOutput = IDL.Record({
 export const idlService = IDL.Service({
   'askAI' : IDL.Func([IDL.Text], [IDL.Text], []),
   'assignRank' : IDL.Func([IDL.Text, IDL.Text, Rank], [IDL.Bool], []),
+  'banUser' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Text], [IDL.Bool], []),
+  'checkBan' : IDL.Func(
+      [IDL.Text],
+      [
+        IDL.Record({
+          'expiresAt' : IDL.Int,
+          'banned' : IDL.Bool,
+          'reason' : IDL.Text,
+        }),
+      ],
+      ['query'],
+    ),
+  'deleteMessage' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+  'editMessage' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [IDL.Bool], []),
   'getDMs' : IDL.Func([IDL.Text, IDL.Text], [IDL.Vec(Message)], ['query']),
   'getMessages' : IDL.Func([IDL.Int], [IDL.Vec(Message)], ['query']),
+  'getSplash' : IDL.Func([], [IDL.Text], ['query']),
   'getUserRank' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
   'getUsers' : IDL.Func([], [IDL.Vec(User)], ['query']),
   'registerUser' : IDL.Func([IDL.Text], [IDL.Text], []),
   'sendDM' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
-  'sendMessage' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
+  'sendMessage' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Text)],
+      [IDL.Nat],
+      [],
+    ),
+  'setSplash' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
   'transform' : IDL.Func(
       [TransformationInput],
       [TransformationOutput],
@@ -69,17 +93,21 @@ export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
   const Rank = IDL.Variant({
+    'VIP' : IDL.Null,
     'Employee' : IDL.Null,
     'Admin' : IDL.Null,
     'Friend' : IDL.Null,
   });
   const Message = IDL.Record({
     'id' : IDL.Nat,
+    'replyToText' : IDL.Opt(IDL.Text),
     'userName' : IDL.Text,
     'userRank' : IDL.Text,
+    'edited' : IDL.Bool,
     'userId' : IDL.Text,
     'text' : IDL.Text,
     'timestamp' : IDL.Int,
+    'replyToId' : IDL.Opt(IDL.Nat),
   });
   const User = IDL.Record({
     'id' : IDL.Text,
@@ -106,13 +134,37 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     'askAI' : IDL.Func([IDL.Text], [IDL.Text], []),
     'assignRank' : IDL.Func([IDL.Text, IDL.Text, Rank], [IDL.Bool], []),
+    'banUser' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Nat, IDL.Text],
+        [IDL.Bool],
+        [],
+      ),
+    'checkBan' : IDL.Func(
+        [IDL.Text],
+        [
+          IDL.Record({
+            'expiresAt' : IDL.Int,
+            'banned' : IDL.Bool,
+            'reason' : IDL.Text,
+          }),
+        ],
+        ['query'],
+      ),
+    'deleteMessage' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+    'editMessage' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [IDL.Bool], []),
     'getDMs' : IDL.Func([IDL.Text, IDL.Text], [IDL.Vec(Message)], ['query']),
     'getMessages' : IDL.Func([IDL.Int], [IDL.Vec(Message)], ['query']),
+    'getSplash' : IDL.Func([], [IDL.Text], ['query']),
     'getUserRank' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'getUsers' : IDL.Func([], [IDL.Vec(User)], ['query']),
     'registerUser' : IDL.Func([IDL.Text], [IDL.Text], []),
     'sendDM' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
-    'sendMessage' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
+    'sendMessage' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Text)],
+        [IDL.Nat],
+        [],
+      ),
+    'setSplash' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
     'transform' : IDL.Func(
         [TransformationInput],
         [TransformationOutput],

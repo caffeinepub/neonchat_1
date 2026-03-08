@@ -7,6 +7,7 @@ import {
   MessageCircle,
   Send,
   Shield,
+  ShieldAlert,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -14,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { RankBadge } from "./RankBadge";
 
-type SidebarView = "menu" | "ai" | "dm";
+type SidebarView = "menu" | "ai" | "dm" | "admin";
 type DMView = "list" | "thread";
 
 interface User {
@@ -44,10 +45,12 @@ interface SidebarProps {
   userRank: string;
   onClose: () => void;
   actor: backendInterface | null;
+  onMessagesRefresh?: () => void;
 }
 
 const RANK_OPTIONS: { value: Rank; label: string }[] = [
   { value: "Admin" as Rank, label: "Admin" },
+  { value: "VIP" as Rank, label: "VIP" },
   { value: "Employee" as Rank, label: "Employee" },
   { value: "Friend" as Rank, label: "Friend" },
 ];
@@ -85,6 +88,18 @@ export function Sidebar({
   const [isAILoading, setIsAILoading] = useState(false);
   const [assigningFor, setAssigningFor] = useState<string | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
+
+  // Admin ban state
+  const [banTargetId, setBanTargetId] = useState("");
+  const [banDuration, setBanDuration] = useState("60");
+  const [banReason, setBanReason] = useState("");
+  const [isBanning, setIsBanning] = useState(false);
+
+  // Splash edit state
+  const [splashText, setSplashText] = useState("");
+  const [isSavingSplash, setIsSavingSplash] = useState(false);
+  const [isLoadingSplash, setIsLoadingSplash] = useState(false);
+
   const aiMsgCounter = useRef(0);
   const dmEndRef = useRef<HTMLDivElement>(null);
   const aiEndRef = useRef<HTMLDivElement>(null);
@@ -116,6 +131,28 @@ export function Sidebar({
     fetch();
     const interval = setInterval(fetch, 5000);
     return () => clearInterval(interval);
+  }, [view, actor, userId]);
+
+  // Fetch users and splash when admin panel opens
+  useEffect(() => {
+    if (view !== "admin" || !actor) return;
+
+    const fetchAll = async () => {
+      setIsLoadingSplash(true);
+      try {
+        const [list, splash] = await Promise.all([
+          actor.getUsers(),
+          actor.getSplash(),
+        ]);
+        setUsers(list.filter((u) => u.id !== userId));
+        setSplashText(splash);
+      } catch {
+        // silent
+      } finally {
+        setIsLoadingSplash(false);
+      }
+    };
+    fetchAll();
   }, [view, actor, userId]);
 
   // Poll DMs when thread open
@@ -199,7 +236,6 @@ export function Sidebar({
       const success = await actor.assignRank(userId, targetUserId, newRank);
       if (success) {
         toast.success(`Rank updated to ${newRank}`);
-        // Refresh user list to reflect rank change
         const list = await actor.getUsers();
         setUsers(list.filter((u) => u.id !== userId));
       } else {
@@ -212,8 +248,69 @@ export function Sidebar({
     }
   };
 
+  const handleBanUser = async () => {
+    if (!actor || !banTargetId || !banDuration || isBanning) return;
+    const minutes = Number.parseInt(banDuration, 10);
+    if (Number.isNaN(minutes) || minutes <= 0) {
+      toast.error("Enter a valid duration in minutes");
+      return;
+    }
+    if (!banReason.trim()) {
+      toast.error("Please enter a ban reason");
+      return;
+    }
+    setIsBanning(true);
+    try {
+      const success = await actor.banUser(
+        userId,
+        banTargetId,
+        BigInt(minutes),
+        banReason.trim(),
+      );
+      if (success) {
+        toast.success("User banned successfully");
+        setBanTargetId("");
+        setBanDuration("60");
+        setBanReason("");
+      } else {
+        toast.error("Failed to ban user");
+      }
+    } catch {
+      toast.error("Error banning user");
+    } finally {
+      setIsBanning(false);
+    }
+  };
+
+  const handleSaveSplash = async () => {
+    if (!actor || isSavingSplash) return;
+    setIsSavingSplash(true);
+    try {
+      const success = await actor.setSplash(userId, splashText);
+      if (success) {
+        toast.success("Announcement saved");
+      } else {
+        toast.error("Failed to save announcement");
+      }
+    } catch {
+      toast.error("Error saving announcement");
+    } finally {
+      setIsSavingSplash(false);
+    }
+  };
+
   const sidebarBg = "oklch(0.10 0.02 242)";
   const borderColor = "oklch(0.82 0.2 196 / 0.15)";
+
+  const getViewTitle = () => {
+    if (view === "menu") return "TOOLS";
+    if (view === "ai") return "AI ASSISTANT";
+    if (view === "admin") return "ADMIN PANEL";
+    if (dmView === "thread" && selectedUser) return `DM · ${selectedUser.name}`;
+    return "DIRECT MSG";
+  };
+
+  const showBackArrow = view === "ai" || view === "dm" || view === "admin";
 
   return (
     <>
@@ -247,7 +344,7 @@ export function Sidebar({
           style={{ borderColor }}
         >
           <div className="flex items-center gap-2">
-            {(view === "ai" || view === "dm") && (
+            {showBackArrow && (
               <button
                 type="button"
                 onClick={() => {
@@ -275,13 +372,7 @@ export function Sidebar({
               className="font-mono text-sm font-semibold tracking-wider"
               style={{ color: "oklch(0.82 0.2 196 / 0.8)" }}
             >
-              {view === "menu"
-                ? "TOOLS"
-                : view === "ai"
-                  ? "AI ASSISTANT"
-                  : dmView === "thread" && selectedUser
-                    ? `DM · ${selectedUser.name}`
-                    : "DIRECT MSG"}
+              {getViewTitle()}
             </span>
           </div>
           <button
@@ -377,6 +468,48 @@ export function Sidebar({
                   </div>
                 </div>
               </button>
+
+              {/* Admin Panel button — only visible to admins */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  data-ocid="sidebar.admin.tab"
+                  onClick={() => setView("admin")}
+                  className="group flex items-center gap-4 p-4 rounded-sm transition-all duration-200 text-left"
+                  style={{
+                    background: "oklch(0.13 0.025 242)",
+                    border: "1px solid oklch(0.85 0.19 80 / 0.2)",
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0 transition-all duration-200 group-hover:scale-105"
+                    style={{
+                      background: "oklch(0.85 0.19 80 / 0.12)",
+                      border: "1px solid oklch(0.85 0.19 80 / 0.35)",
+                      boxShadow: "0 0 12px oklch(0.85 0.19 80 / 0.18)",
+                    }}
+                  >
+                    <ShieldAlert
+                      className="w-5 h-5"
+                      style={{ color: "oklch(0.85 0.19 80)" }}
+                    />
+                  </div>
+                  <div>
+                    <div
+                      className="font-mono text-sm font-semibold mb-0.5"
+                      style={{ color: "oklch(0.85 0.19 80)" }}
+                    >
+                      Admin Panel
+                    </div>
+                    <div
+                      className="font-mono text-xs"
+                      style={{ color: "oklch(0.85 0.19 80 / 0.45)" }}
+                    >
+                      Ban users · Manage announcements
+                    </div>
+                  </div>
+                </button>
+              )}
 
               {/* User info */}
               <div
@@ -644,21 +777,27 @@ export function Sidebar({
                                     background:
                                       opt.value === "Admin"
                                         ? "oklch(0.85 0.19 80 / 0.12)"
-                                        : opt.value === "Employee"
-                                          ? "oklch(0.82 0.2 196 / 0.1)"
-                                          : "oklch(0.65 0.05 230 / 0.08)",
+                                        : opt.value === "VIP"
+                                          ? "oklch(0.88 0.18 55 / 0.1)"
+                                          : opt.value === "Employee"
+                                            ? "oklch(0.82 0.2 196 / 0.1)"
+                                            : "oklch(0.65 0.05 230 / 0.08)",
                                     border:
                                       opt.value === "Admin"
                                         ? "1px solid oklch(0.85 0.19 80 / 0.35)"
-                                        : opt.value === "Employee"
-                                          ? "1px solid oklch(0.82 0.2 196 / 0.3)"
-                                          : "1px solid oklch(0.65 0.05 230 / 0.2)",
+                                        : opt.value === "VIP"
+                                          ? "1px solid oklch(0.88 0.18 55 / 0.4)"
+                                          : opt.value === "Employee"
+                                            ? "1px solid oklch(0.82 0.2 196 / 0.3)"
+                                            : "1px solid oklch(0.65 0.05 230 / 0.2)",
                                     color:
                                       opt.value === "Admin"
                                         ? "oklch(0.85 0.19 80)"
-                                        : opt.value === "Employee"
-                                          ? "oklch(0.82 0.2 196)"
-                                          : "oklch(0.65 0.05 230)",
+                                        : opt.value === "VIP"
+                                          ? "oklch(0.88 0.18 55)"
+                                          : opt.value === "Employee"
+                                            ? "oklch(0.82 0.2 196)"
+                                            : "oklch(0.65 0.05 230)",
                                   }}
                                 >
                                   {opt.label}
@@ -787,6 +926,222 @@ export function Sidebar({
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Admin Panel view */}
+          {view === "admin" && (
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+              {/* ── Ban User section ── */}
+              <section>
+                <div
+                  className="flex items-center gap-2 mb-3 pb-2 border-b"
+                  style={{ borderColor: "oklch(0.62 0.24 25 / 0.2)" }}
+                >
+                  <ShieldAlert
+                    className="w-4 h-4"
+                    style={{ color: "oklch(0.72 0.24 25 / 0.8)" }}
+                  />
+                  <span
+                    className="font-mono text-xs font-semibold tracking-widest uppercase"
+                    style={{ color: "oklch(0.72 0.24 25 / 0.8)" }}
+                  >
+                    Ban User
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {/* User select */}
+                  <div>
+                    <label
+                      htmlFor="ban-user-select"
+                      className="font-mono text-xs mb-1 block"
+                      style={{ color: "oklch(0.65 0.08 210 / 0.7)" }}
+                    >
+                      Select user
+                    </label>
+                    <select
+                      id="ban-user-select"
+                      data-ocid="admin.ban.select"
+                      value={banTargetId}
+                      onChange={(e) => setBanTargetId(e.target.value)}
+                      className="w-full font-mono text-xs px-3 py-2 rounded-sm outline-none"
+                      style={{
+                        background: "oklch(0.14 0.025 242)",
+                        border: "1px solid oklch(0.62 0.24 25 / 0.25)",
+                        color: banTargetId
+                          ? "oklch(0.92 0.04 200)"
+                          : "oklch(0.55 0.07 210 / 0.5)",
+                      }}
+                    >
+                      <option value="">-- Choose user --</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Duration */}
+                  <div>
+                    <label
+                      htmlFor="ban-duration-input"
+                      className="font-mono text-xs mb-1 block"
+                      style={{ color: "oklch(0.65 0.08 210 / 0.7)" }}
+                    >
+                      Duration (minutes)
+                    </label>
+                    <input
+                      id="ban-duration-input"
+                      data-ocid="admin.ban.input"
+                      type="number"
+                      min="1"
+                      value={banDuration}
+                      onChange={(e) => setBanDuration(e.target.value)}
+                      className="w-full font-mono text-xs px-3 py-2 rounded-sm outline-none"
+                      style={{
+                        background: "oklch(0.14 0.025 242)",
+                        border: "1px solid oklch(0.62 0.24 25 / 0.25)",
+                        color: "oklch(0.92 0.04 200)",
+                      }}
+                    />
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label
+                      htmlFor="ban-reason-textarea"
+                      className="font-mono text-xs mb-1 block"
+                      style={{ color: "oklch(0.65 0.08 210 / 0.7)" }}
+                    >
+                      Reason
+                    </label>
+                    <textarea
+                      id="ban-reason-textarea"
+                      data-ocid="admin.ban.textarea"
+                      value={banReason}
+                      onChange={(e) => setBanReason(e.target.value)}
+                      placeholder="Why are they being banned?"
+                      rows={3}
+                      className="w-full font-mono text-xs px-3 py-2 rounded-sm outline-none resize-none placeholder:opacity-40"
+                      style={{
+                        background: "oklch(0.14 0.025 242)",
+                        border: "1px solid oklch(0.62 0.24 25 / 0.25)",
+                        color: "oklch(0.92 0.04 200)",
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    data-ocid="admin.ban.submit_button"
+                    onClick={handleBanUser}
+                    disabled={isBanning || !banTargetId || !banReason.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-sm font-mono text-xs tracking-widest uppercase transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{
+                      background: "oklch(0.62 0.24 25 / 0.12)",
+                      border: "1px solid oklch(0.62 0.24 25 / 0.4)",
+                      color: "oklch(0.72 0.24 25)",
+                    }}
+                  >
+                    {isBanning ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                    )}
+                    {isBanning ? "Banning..." : "Ban User"}
+                  </button>
+                </div>
+              </section>
+
+              {/* Divider */}
+              <div
+                className="w-full h-px"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent, oklch(0.82 0.2 196 / 0.15), transparent)",
+                }}
+              />
+
+              {/* ── Edit Announcement section ── */}
+              <section>
+                <div
+                  className="flex items-center gap-2 mb-3 pb-2 border-b"
+                  style={{ borderColor: "oklch(0.82 0.2 196 / 0.15)" }}
+                >
+                  <Shield
+                    className="w-4 h-4"
+                    style={{ color: "oklch(0.82 0.2 196 / 0.7)" }}
+                  />
+                  <span
+                    className="font-mono text-xs font-semibold tracking-widest uppercase"
+                    style={{ color: "oklch(0.82 0.2 196 / 0.7)" }}
+                  >
+                    Edit Announcement
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {isLoadingSplash ? (
+                    <div className="flex items-center gap-2 py-4 justify-center">
+                      <Loader2
+                        className="w-4 h-4 animate-spin"
+                        style={{ color: "oklch(0.82 0.2 196 / 0.4)" }}
+                      />
+                      <span className="font-mono text-xs text-neon-cyan/30">
+                        Loading...
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label
+                          htmlFor="splash-textarea"
+                          className="font-mono text-xs mb-1 block"
+                          style={{ color: "oklch(0.65 0.08 210 / 0.7)" }}
+                        >
+                          Announcement text
+                        </label>
+                        <textarea
+                          id="splash-textarea"
+                          data-ocid="admin.splash.textarea"
+                          value={splashText}
+                          onChange={(e) => setSplashText(e.target.value)}
+                          placeholder="Enter announcement shown to all users on login..."
+                          rows={5}
+                          className="w-full font-mono text-xs px-3 py-2 rounded-sm outline-none resize-none placeholder:opacity-40"
+                          style={{
+                            background: "oklch(0.14 0.025 242)",
+                            border: "1px solid oklch(0.82 0.2 196 / 0.2)",
+                            color: "oklch(0.92 0.04 200)",
+                          }}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        data-ocid="admin.splash.submit_button"
+                        onClick={handleSaveSplash}
+                        disabled={isSavingSplash}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-sm font-mono text-xs tracking-widest uppercase transition-all duration-200 disabled:opacity-30"
+                        style={{
+                          background: "oklch(0.82 0.2 196 / 0.1)",
+                          border: "1px solid oklch(0.82 0.2 196 / 0.35)",
+                          color: "oklch(0.82 0.2 196)",
+                        }}
+                      >
+                        {isSavingSplash ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Shield className="w-3.5 h-3.5" />
+                        )}
+                        {isSavingSplash ? "Saving..." : "Save Announcement"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </section>
             </div>
           )}
         </div>

@@ -106,11 +106,14 @@ export interface User {
 }
 export interface Message {
     id: bigint;
+    replyToText?: string;
     userName: string;
     userRank: string;
+    edited: boolean;
     userId: string;
     text: string;
     timestamp: bigint;
+    replyToId?: bigint;
 }
 export interface http_header {
     value: string;
@@ -122,6 +125,7 @@ export interface http_request_result {
     headers: Array<http_header>;
 }
 export enum Rank {
+    VIP = "VIP",
     Employee = "Employee",
     Admin = "Admin",
     Friend = "Friend"
@@ -129,18 +133,28 @@ export enum Rank {
 export interface backendInterface {
     askAI(prompt: string): Promise<string>;
     assignRank(adminUserId: string, targetUserId: string, rank: Rank): Promise<boolean>;
+    banUser(adminUserId: string, targetUserId: string, durationMinutes: bigint, reason: string): Promise<boolean>;
+    checkBan(userId: string): Promise<{
+        expiresAt: bigint;
+        banned: boolean;
+        reason: string;
+    }>;
+    deleteMessage(adminUserId: string, messageId: bigint): Promise<boolean>;
+    editMessage(adminUserId: string, messageId: bigint, newText: string): Promise<boolean>;
     getDMs(userId: string, _otherUserId: string): Promise<Array<Message>>;
     getMessages(since: bigint): Promise<Array<Message>>;
+    getSplash(): Promise<string>;
     getUserRank(userId: string): Promise<string>;
     getUsers(): Promise<Array<User>>;
     registerUser(name: string): Promise<string>;
     sendDM(fromUserId: string, toUserId: string, text: string): Promise<bigint>;
-    sendMessage(userId: string, text: string): Promise<bigint>;
+    sendMessage(userId: string, text: string, replyToId: bigint | null, replyToText: string | null): Promise<bigint>;
+    setSplash(adminUserId: string, text: string): Promise<boolean>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
     updateLastSeen(userId: string): Promise<void>;
     verifyCode(code: string): Promise<boolean>;
 }
-import type { Rank as _Rank, User as _User } from "./declarations/backend.did.d.ts";
+import type { Message as _Message, Rank as _Rank, User as _User } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async askAI(arg0: string): Promise<string> {
@@ -171,31 +185,105 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async banUser(arg0: string, arg1: string, arg2: bigint, arg3: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.banUser(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.banUser(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async checkBan(arg0: string): Promise<{
+        expiresAt: bigint;
+        banned: boolean;
+        reason: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.checkBan(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.checkBan(arg0);
+            return result;
+        }
+    }
+    async deleteMessage(arg0: string, arg1: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteMessage(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteMessage(arg0, arg1);
+            return result;
+        }
+    }
+    async editMessage(arg0: string, arg1: bigint, arg2: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.editMessage(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.editMessage(arg0, arg1, arg2);
+            return result;
+        }
+    }
     async getDMs(arg0: string, arg1: string): Promise<Array<Message>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getDMs(arg0, arg1);
-                return result;
+                return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getDMs(arg0, arg1);
-            return result;
+            return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
         }
     }
     async getMessages(arg0: bigint): Promise<Array<Message>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getMessages(arg0);
-                return result;
+                return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getMessages(arg0);
+            return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getSplash(): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSplash();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSplash();
             return result;
         }
     }
@@ -217,14 +305,14 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getUsers();
-                return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getUsers();
-            return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
         }
     }
     async registerUser(arg0: string): Promise<string> {
@@ -255,17 +343,31 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async sendMessage(arg0: string, arg1: string): Promise<bigint> {
+    async sendMessage(arg0: string, arg1: string, arg2: bigint | null, arg3: string | null): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.sendMessage(arg0, arg1);
+                const result = await this.actor.sendMessage(arg0, arg1, to_candid_opt_n13(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n14(this._uploadFile, this._downloadFile, arg3));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.sendMessage(arg0, arg1);
+            const result = await this.actor.sendMessage(arg0, arg1, to_candid_opt_n13(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n14(this._uploadFile, this._downloadFile, arg3));
+            return result;
+        }
+    }
+    async setSplash(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setSplash(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setSplash(arg0, arg1);
             return result;
         }
     }
@@ -312,13 +414,22 @@ export class Backend implements backendInterface {
         }
     }
 }
-function from_candid_Rank_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Rank): Rank {
-    return from_candid_variant_n7(_uploadFile, _downloadFile, value);
-}
-function from_candid_User_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _User): User {
+function from_candid_Message_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Message): Message {
     return from_candid_record_n5(_uploadFile, _downloadFile, value);
 }
-function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_Rank_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Rank): Rank {
+    return from_candid_variant_n12(_uploadFile, _downloadFile, value);
+}
+function from_candid_User_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _User): User {
+    return from_candid_record_n10(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [bigint]): bigint | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: string;
     name: string;
     rank: _Rank;
@@ -332,33 +443,81 @@ function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint
     return {
         id: value.id,
         name: value.name,
-        rank: from_candid_Rank_n6(_uploadFile, _downloadFile, value.rank),
+        rank: from_candid_Rank_n11(_uploadFile, _downloadFile, value.rank),
         lastSeen: value.lastSeen
     };
 }
-function from_candid_variant_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: bigint;
+    replyToText: [] | [string];
+    userName: string;
+    userRank: string;
+    edited: boolean;
+    userId: string;
+    text: string;
+    timestamp: bigint;
+    replyToId: [] | [bigint];
+}): {
+    id: bigint;
+    replyToText?: string;
+    userName: string;
+    userRank: string;
+    edited: boolean;
+    userId: string;
+    text: string;
+    timestamp: bigint;
+    replyToId?: bigint;
+} {
+    return {
+        id: value.id,
+        replyToText: record_opt_to_undefined(from_candid_opt_n6(_uploadFile, _downloadFile, value.replyToText)),
+        userName: value.userName,
+        userRank: value.userRank,
+        edited: value.edited,
+        userId: value.userId,
+        text: value.text,
+        timestamp: value.timestamp,
+        replyToId: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.replyToId))
+    };
+}
+function from_candid_variant_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    VIP: null;
+} | {
     Employee: null;
 } | {
     Admin: null;
 } | {
     Friend: null;
 }): Rank {
-    return "Employee" in value ? Rank.Employee : "Admin" in value ? Rank.Admin : "Friend" in value ? Rank.Friend : value;
+    return "VIP" in value ? Rank.VIP : "Employee" in value ? Rank.Employee : "Admin" in value ? Rank.Admin : "Friend" in value ? Rank.Friend : value;
 }
-function from_candid_vec_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_User>): Array<User> {
-    return value.map((x)=>from_candid_User_n4(_uploadFile, _downloadFile, x));
+function from_candid_vec_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Message>): Array<Message> {
+    return value.map((x)=>from_candid_Message_n4(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_User>): Array<User> {
+    return value.map((x)=>from_candid_User_n9(_uploadFile, _downloadFile, x));
 }
 function to_candid_Rank_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Rank): _Rank {
     return to_candid_variant_n2(_uploadFile, _downloadFile, value);
 }
+function to_candid_opt_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: bigint | null): [] | [bigint] {
+    return value === null ? candid_none() : candid_some(value);
+}
+function to_candid_opt_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+    return value === null ? candid_none() : candid_some(value);
+}
 function to_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Rank): {
+    VIP: null;
+} | {
     Employee: null;
 } | {
     Admin: null;
 } | {
     Friend: null;
 } {
-    return value == Rank.Employee ? {
+    return value == Rank.VIP ? {
+        VIP: null
+    } : value == Rank.Employee ? {
         Employee: null
     } : value == Rank.Admin ? {
         Admin: null

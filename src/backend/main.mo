@@ -9,14 +9,15 @@ import Order "mo:core/Order";
 import Iter "mo:core/Iter";
 import Runtime "mo:core/Runtime";
 import OutCall "http-outcalls/outcall";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   type Rank = {
     #Admin;
     #Employee;
     #Friend;
+    #VIP;
   };
 
   type Message = {
@@ -26,6 +27,9 @@ actor {
     text : Text;
     timestamp : Int;
     userRank : Text;
+    replyToId : ?Nat;
+    replyToText : ?Text;
+    edited : Bool;
   };
 
   module Message {
@@ -58,12 +62,21 @@ actor {
     };
   };
 
+  type BanRecord = {
+    userId : Text;
+    expiresAt : Int; // Unix timestamp in seconds
+    reason : Text;
+  };
+
   var nextMessageId = 0;
   var nextUserId = 0;
 
   let users = Map.empty<Text, User>();
   let publicMessages = List.empty<Message>();
   let directMessages = Map.empty<Text, List.List<Message>>();
+  let bans = Map.empty<Text, BanRecord>();
+
+  var splash : Text = "";
 
   let verificationArray = [
     // Smart move using test array, let's keep this until a fix is out.
@@ -87,7 +100,7 @@ actor {
 
   public shared ({ caller }) func registerUser(name : Text) : async Text {
     let userId = generateUserId();
-    let rank : Rank = if (name == "NEXUS") { #Admin } else { #Friend };
+    let rank : Rank = if (name == "NEXUS" or name == "admin") { #Admin } else { #Friend };
     let user : User = {
       id = userId;
       name;
@@ -100,7 +113,7 @@ actor {
 
   public query ({ caller }) func getUserRank(userId : Text) : async Text {
     switch (users.get(userId)) {
-      case (null) { Runtime.trap("User not found") };
+      case (null) { "Not found" };
       case (?user) { rankToText(user.rank) };
     };
   };
@@ -110,6 +123,7 @@ actor {
       case (#Admin) { "Admin" };
       case (#Employee) { "Employee" };
       case (#Friend) { "Friend" };
+      case (#VIP) { "VIP" };
     };
   };
 
@@ -119,7 +133,7 @@ actor {
 
   public shared ({ caller }) func updateLastSeen(userId : Text) : async () {
     switch (users.get(userId)) {
-      case (null) { Runtime.trap("User not found") };
+      case (null) { Runtime.trap("User not found!") };
       case (?user) {
         let updatedUser : User = {
           id = user.id;
@@ -132,7 +146,28 @@ actor {
     };
   };
 
-  public shared ({ caller }) func sendMessage(userId : Text, text : Text) : async Nat {
+  public query ({ caller }) func getSplash() : async Text {
+    splash;
+  };
+
+  public shared ({ caller }) func setSplash(adminUserId : Text, text : Text) : async Bool {
+    switch (users.get(adminUserId)) {
+      case (null) { false };
+      case (?adminUser) {
+        switch (adminUser.rank) {
+          case (#Admin) {
+            splash := text;
+            true;
+          };
+          case (_) { false };
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func sendMessage(userId : Text, text : Text, replyToId : ?Nat, replyToText : ?Text) : async Nat {
+    checkBanAndThrow(userId);
+
     let user = switch (users.get(userId)) {
       case (null) { Runtime.trap("User not found!") };
       case (?user) { user };
@@ -145,6 +180,9 @@ actor {
       text;
       timestamp = Time.now();
       userRank = rankToText(user.rank);
+      replyToId;
+      replyToText;
+      edited = false;
     };
 
     nextMessageId += 1;
@@ -156,7 +194,7 @@ actor {
     message.id;
   };
 
-  public query ({ caller }) func transform(input: OutCall.TransformationInput) : async OutCall.TransformationOutput {
+  public query ({ caller }) func transform(input : OutCall.TransformationInput) : async OutCall.TransformationOutput {
     OutCall.transform(input);
   };
 
@@ -215,6 +253,9 @@ actor {
       text;
       timestamp = Time.now();
       userRank = rankToText(sender.rank);
+      replyToId = null;
+      replyToText = null;
+      edited = false;
     };
 
     nextMessageId += 1;
@@ -236,4 +277,117 @@ actor {
       case (?messages) { messages.sort().toArray() };
     };
   };
+
+  // NEW Features - Ban System
+  func checkBanAndThrow(userId : Text) {
+    switch (bans.get(userId)) {
+      case (null) { () };
+      case (?ban) {
+        if (Time.now() < ban.expiresAt) {
+          Runtime.trap(
+            "User is banned: " # ban.reason # " until " # ban.expiresAt.toText()
+          );
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func banUser(adminUserId : Text, targetUserId : Text, durationMinutes : Nat, reason : Text) : async Bool {
+    switch (users.get(adminUserId)) {
+      case (null) { false };
+      case (?adminUser) {
+        switch (adminUser.rank) {
+          case (#Admin) {
+            let banRecord : BanRecord = {
+              userId = targetUserId;
+              expiresAt = Time.now() + (durationMinutes.toInt() * 60 * 1_000_000_000);
+              reason;
+            };
+            bans.add(targetUserId, banRecord);
+            true;
+          };
+          case (_) { false };
+        };
+      };
+    };
+  };
+
+  public query ({ caller }) func checkBan(userId : Text) : async {
+    banned : Bool;
+    reason : Text;
+    expiresAt : Int;
+  } {
+    switch (bans.get(userId)) {
+      case (null) {
+        { banned = false; reason = ""; expiresAt = 0 };
+      };
+      case (?ban) {
+        if (Time.now() < ban.expiresAt) {
+          { banned = true; reason = ban.reason; expiresAt = ban.expiresAt };
+        } else {
+          { banned = false; reason = ""; expiresAt = 0 };
+        };
+      };
+    };
+  };
+
+  // EDIT/DELETE Messages (Admin Only)
+  public shared ({ caller }) func editMessage(adminUserId : Text, messageId : Nat, newText : Text) : async Bool {
+    switch (users.get(adminUserId)) {
+      case (null) { false };
+      case (?adminUser) {
+        switch (adminUser.rank) {
+          case (#Admin) {
+            var found = false;
+            let updatedMessages = publicMessages.map<Message, Message>(
+              func(msg) {
+                if (msg.id == messageId) {
+                  found := true;
+                  {
+                    msg with
+                    text = newText;
+                    edited = true;
+                  };
+                } else {
+                  msg;
+                };
+              }
+            );
+            publicMessages.clear();
+            publicMessages.addAll(updatedMessages.reverseValues());
+            found;
+          };
+          case (_) { false };
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteMessage(adminUserId : Text, messageId : Nat) : async Bool {
+    switch (users.get(adminUserId)) {
+      case (null) { false };
+      case (?adminUser) {
+        switch (adminUser.rank) {
+          case (#Admin) {
+            let initialSize = publicMessages.size();
+            if (initialSize == 0) { return false };
+
+            // Remove matching messages
+            let filteredMessages = publicMessages.filter(
+              func(msg) { msg.id != messageId }
+            );
+
+            let filteredSize = filteredMessages.size();
+            publicMessages.clear();
+            publicMessages.addAll(filteredMessages.reverseValues());
+
+            // If the filtered list has fewer messages, a message was deleted.
+            filteredSize < initialSize;
+          };
+          case (_) { false };
+        };
+      };
+    };
+  };
 };
+

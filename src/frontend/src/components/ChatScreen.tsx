@@ -1,5 +1,14 @@
 import { useActor } from "@/hooks/useActor";
-import { LogOut, Radio, Send } from "lucide-react";
+import {
+  CornerDownRight,
+  LogOut,
+  Pencil,
+  Radio,
+  Reply,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +22,9 @@ interface Message {
   userRank: string;
   text: string;
   timestamp: bigint;
+  edited: boolean;
+  replyToId?: bigint;
+  replyToText?: string;
 }
 
 interface ChatScreenProps {
@@ -20,6 +32,12 @@ interface ChatScreenProps {
   userName: string;
   userRank: string;
   onLogout: () => void;
+}
+
+interface ReplyTarget {
+  id: bigint;
+  userName: string;
+  text: string;
 }
 
 function formatTime(timestamp: bigint): string {
@@ -38,13 +56,39 @@ export function ChatScreen({
   const [isSending, setIsSending] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lastMessageId, setLastMessageId] = useState<bigint>(BigInt(0));
+  const [replyingTo, setReplyingTo] = useState<ReplyTarget | null>(null);
+  const [editingId, setEditingId] = useState<bigint | null>(null);
+  const [editText, setEditText] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [deletingId, setDeletingId] = useState<bigint | null>(null);
+  const [hoveredId, setHoveredId] = useState<bigint | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
   const { actor } = useActor();
+
+  const isAdmin = userRank === "Admin";
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  const refreshMessages = useCallback(async () => {
+    if (!actor) return;
+    try {
+      const msgs = await actor.getMessages(BigInt(0));
+      setMessages(msgs);
+      if (msgs.length > 0) {
+        const highest = msgs.reduce(
+          (max, m) => (m.id > max ? m.id : max),
+          BigInt(0),
+        );
+        setLastMessageId(highest);
+      }
+    } catch {
+      // silent
+    }
+  }, [actor]);
 
   // Poll messages every 1.5s
   useEffect(() => {
@@ -87,20 +131,31 @@ export function ChatScreen({
     return () => clearInterval(interval);
   }, [actor, userId]);
 
-  // Scroll to bottom on new messages - triggered by message count change
+  // Scroll to bottom on new messages
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-runs when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // Focus edit input when entering edit mode
+  useEffect(() => {
+    if (editingId !== null) {
+      setTimeout(() => editInputRef.current?.focus(), 50);
+    }
+  }, [editingId]);
+
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || !actor || isSending) return;
 
+    const replyId = replyingTo?.id ?? null;
+    const replyText = replyingTo?.text ?? null;
+
     setIsSending(true);
     setInputText("");
+    setReplyingTo(null);
     try {
-      await actor.sendMessage(userId, text);
+      await actor.sendMessage(userId, text, replyId, replyText);
     } catch {
       toast.error("Failed to send message");
       setInputText(text);
@@ -114,6 +169,60 @@ export function ChatScreen({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+    if (e.key === "Escape") {
+      setReplyingTo(null);
+    }
+  };
+
+  const handleStartEdit = (msg: Message) => {
+    setEditingId(msg.id);
+    setEditText(msg.text);
+    setDeletingId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const handleSaveEdit = async (msgId: bigint) => {
+    const text = editText.trim();
+    if (!text || !actor || isEditing) return;
+    setIsEditing(true);
+    try {
+      const success = await actor.editMessage(userId, msgId, text);
+      if (success) {
+        // Update locally for instant feedback
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? { ...m, text, edited: true } : m)),
+        );
+        setEditingId(null);
+        setEditText("");
+        toast.success("Message edited");
+      } else {
+        toast.error("Failed to edit message");
+      }
+    } catch {
+      toast.error("Error editing message");
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: bigint) => {
+    if (!actor) return;
+    try {
+      const success = await actor.deleteMessage(userId, msgId);
+      if (success) {
+        setMessages((prev) => prev.filter((m) => m.id !== msgId));
+        setDeletingId(null);
+        toast.success("Message deleted");
+      } else {
+        toast.error("Failed to delete message");
+      }
+    } catch {
+      toast.error("Error deleting message");
     }
   };
 
@@ -220,16 +329,26 @@ export function ChatScreen({
           {messages.map((msg, idx) => {
             const own = isOwnMessage(msg);
             const ocid = idx < 10 ? `chat.item.${idx + 1}` : undefined;
+            const isHovered = hoveredId === msg.id;
+            const isBeingEdited = editingId === msg.id;
+            const isConfirmingDelete = deletingId === msg.id;
+
             return (
               <motion.div
                 key={msg.id.toString()}
                 data-ocid={ocid}
                 className={`message-in flex gap-3 mb-3 ${own ? "flex-row-reverse" : "flex-row"}`}
+                onMouseEnter={() => setHoveredId(msg.id)}
+                onMouseLeave={() => {
+                  if (editingId !== msg.id && deletingId !== msg.id) {
+                    setHoveredId(null);
+                  }
+                }}
               >
                 {/* Avatar */}
                 {!own && (
                   <div
-                    className="w-8 h-8 rounded-sm flex-shrink-0 flex items-center justify-center font-mono text-xs font-bold"
+                    className="w-8 h-8 rounded-sm flex-shrink-0 flex items-center justify-center font-mono text-xs font-bold self-start mt-5"
                     style={{
                       background: "oklch(0.82 0.2 196 / 0.12)",
                       border: "1px solid oklch(0.82 0.2 196 / 0.2)",
@@ -264,28 +383,243 @@ export function ChatScreen({
                     >
                       {formatTime(msg.timestamp)}
                     </span>
+                    {msg.edited && (
+                      <span
+                        className="font-mono text-[9px] italic"
+                        style={{ color: "oklch(0.55 0.07 210 / 0.5)" }}
+                      >
+                        (edited)
+                      </span>
+                    )}
                   </div>
 
+                  {/* Reply quote block */}
+                  {msg.replyToText && (
+                    <div
+                      className={`flex items-start gap-1.5 max-w-full ${own ? "flex-row-reverse" : "flex-row"}`}
+                    >
+                      <CornerDownRight
+                        className="w-3 h-3 flex-shrink-0 mt-0.5"
+                        style={{ color: "oklch(0.55 0.07 210 / 0.5)" }}
+                      />
+                      <div
+                        className="px-2 py-1 rounded-sm font-mono text-[10px] max-w-[90%] truncate"
+                        style={{
+                          background: "oklch(0.82 0.2 196 / 0.06)",
+                          border: "1px solid oklch(0.82 0.2 196 / 0.15)",
+                          color: "oklch(0.65 0.08 200 / 0.7)",
+                          borderLeft: own
+                            ? undefined
+                            : "2px solid oklch(0.82 0.2 196 / 0.3)",
+                          borderRight: own
+                            ? "2px solid oklch(0.72 0.25 310 / 0.3)"
+                            : undefined,
+                        }}
+                      >
+                        {msg.replyToText}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Bubble */}
-                  <div
-                    className="px-4 py-2.5 rounded-sm font-sora text-sm leading-relaxed"
-                    style={
-                      own
-                        ? {
-                            background: "oklch(0.72 0.25 310 / 0.15)",
-                            border: "1px solid oklch(0.72 0.25 310 / 0.3)",
-                            color: "oklch(0.92 0.04 200)",
-                            boxShadow: "0 0 12px oklch(0.72 0.25 310 / 0.1)",
+                  {isBeingEdited ? (
+                    <div
+                      className="w-full min-w-[240px] rounded-sm p-2"
+                      style={{
+                        background: "oklch(0.13 0.025 242)",
+                        border: "1px solid oklch(0.82 0.2 196 / 0.3)",
+                        boxShadow: "0 0 12px oklch(0.82 0.2 196 / 0.1)",
+                      }}
+                    >
+                      <textarea
+                        ref={editInputRef}
+                        data-ocid="chat.editor"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSaveEdit(msg.id);
                           }
-                        : {
-                            background: "oklch(0.13 0.025 242 / 0.9)",
+                          if (e.key === "Escape") handleCancelEdit();
+                        }}
+                        rows={2}
+                        className="w-full bg-transparent font-sora text-sm outline-none resize-none"
+                        style={{ color: "oklch(0.92 0.04 200)" }}
+                      />
+                      <div className="flex gap-2 mt-2 justify-end">
+                        <button
+                          type="button"
+                          data-ocid="chat.cancel_button"
+                          onClick={handleCancelEdit}
+                          disabled={isEditing}
+                          className="font-mono text-xs px-2 py-1 rounded-sm transition-all duration-150"
+                          style={{
+                            color: "oklch(0.55 0.07 210 / 0.7)",
+                            border: "1px solid oklch(0.55 0.07 210 / 0.2)",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          data-ocid="chat.save_button"
+                          onClick={() => handleSaveEdit(msg.id)}
+                          disabled={isEditing || !editText.trim()}
+                          className="font-mono text-xs px-2 py-1 rounded-sm transition-all duration-150 disabled:opacity-30"
+                          style={{
+                            background: "oklch(0.82 0.2 196 / 0.12)",
+                            border: "1px solid oklch(0.82 0.2 196 / 0.35)",
+                            color: "oklch(0.82 0.2 196)",
+                          }}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="px-4 py-2.5 rounded-sm font-sora text-sm leading-relaxed"
+                      style={
+                        own
+                          ? {
+                              background: "oklch(0.72 0.25 310 / 0.15)",
+                              border: "1px solid oklch(0.72 0.25 310 / 0.3)",
+                              color: "oklch(0.92 0.04 200)",
+                              boxShadow: "0 0 12px oklch(0.72 0.25 310 / 0.1)",
+                            }
+                          : {
+                              background: "oklch(0.13 0.025 242 / 0.9)",
+                              border: "1px solid oklch(0.82 0.2 196 / 0.15)",
+                              color: "oklch(0.88 0.04 200)",
+                            }
+                      }
+                    >
+                      {msg.text}
+                    </div>
+                  )}
+
+                  {/* Delete confirm inline */}
+                  <AnimatePresence>
+                    {isConfirmingDelete && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex items-center gap-2 overflow-hidden"
+                      >
+                        <span
+                          className="font-mono text-xs"
+                          style={{ color: "oklch(0.72 0.24 25 / 0.8)" }}
+                        >
+                          Delete?
+                        </span>
+                        <button
+                          type="button"
+                          data-ocid="chat.confirm_button"
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          className="font-mono text-xs px-2 py-0.5 rounded-sm transition-all duration-150"
+                          style={{
+                            background: "oklch(0.62 0.24 25 / 0.15)",
+                            border: "1px solid oklch(0.62 0.24 25 / 0.4)",
+                            color: "oklch(0.72 0.24 25)",
+                          }}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          data-ocid="chat.cancel_button"
+                          onClick={() => {
+                            setDeletingId(null);
+                            setHoveredId(null);
+                          }}
+                          className="font-mono text-xs px-2 py-0.5 rounded-sm transition-all duration-150"
+                          style={{
+                            color: "oklch(0.55 0.07 210 / 0.6)",
+                            border: "1px solid oklch(0.55 0.07 210 / 0.15)",
+                          }}
+                        >
+                          No
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Message action toolbar */}
+                  <AnimatePresence>
+                    {isHovered && !isBeingEdited && !isConfirmingDelete && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.12 }}
+                        className={`flex items-center gap-1 ${own ? "flex-row-reverse" : "flex-row"}`}
+                      >
+                        {/* Reply button */}
+                        <button
+                          type="button"
+                          data-ocid="chat.secondary_button"
+                          title="Reply"
+                          onClick={() =>
+                            setReplyingTo({
+                              id: msg.id,
+                              userName: msg.userName,
+                              text: msg.text,
+                            })
+                          }
+                          className="flex items-center gap-1 px-2 py-1 rounded-sm font-mono text-[10px] transition-all duration-150"
+                          style={{
+                            background: "oklch(0.82 0.2 196 / 0.07)",
                             border: "1px solid oklch(0.82 0.2 196 / 0.15)",
-                            color: "oklch(0.88 0.04 200)",
-                          }
-                    }
-                  >
-                    {msg.text}
-                  </div>
+                            color: "oklch(0.82 0.2 196 / 0.6)",
+                          }}
+                        >
+                          <Reply className="w-3 h-3" />
+                          Reply
+                        </button>
+
+                        {/* Admin controls */}
+                        {isAdmin && (
+                          <>
+                            <button
+                              type="button"
+                              data-ocid="chat.edit_button"
+                              title="Edit message"
+                              onClick={() => handleStartEdit(msg)}
+                              className="flex items-center gap-1 px-2 py-1 rounded-sm font-mono text-[10px] transition-all duration-150"
+                              style={{
+                                background: "oklch(0.85 0.19 80 / 0.08)",
+                                border: "1px solid oklch(0.85 0.19 80 / 0.2)",
+                                color: "oklch(0.85 0.19 80 / 0.7)",
+                              }}
+                            >
+                              <Pencil className="w-3 h-3" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              data-ocid="chat.delete_button"
+                              title="Delete message"
+                              onClick={() => {
+                                setDeletingId(msg.id);
+                                setEditingId(null);
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 rounded-sm font-mono text-[10px] transition-all duration-150"
+                              style={{
+                                background: "oklch(0.62 0.24 25 / 0.08)",
+                                border: "1px solid oklch(0.62 0.24 25 / 0.2)",
+                                color: "oklch(0.72 0.24 25 / 0.7)",
+                              }}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             );
@@ -303,6 +637,57 @@ export function ChatScreen({
           backdropFilter: "blur(12px)",
         }}
       >
+        {/* Reply preview bar */}
+        <AnimatePresence>
+          {replyingTo && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.15 }}
+              className="overflow-hidden mb-2"
+            >
+              <div
+                data-ocid="chat.panel"
+                className="flex items-center gap-3 px-3 py-2 rounded-sm"
+                style={{
+                  background: "oklch(0.82 0.2 196 / 0.06)",
+                  border: "1px solid oklch(0.82 0.2 196 / 0.2)",
+                  borderLeft: "3px solid oklch(0.82 0.2 196 / 0.5)",
+                }}
+              >
+                <Reply
+                  className="w-3.5 h-3.5 flex-shrink-0"
+                  style={{ color: "oklch(0.82 0.2 196 / 0.6)" }}
+                />
+                <div className="flex-1 min-w-0">
+                  <span
+                    className="font-mono text-[10px] font-semibold"
+                    style={{ color: "oklch(0.82 0.2 196 / 0.7)" }}
+                  >
+                    Replying to {replyingTo.userName}
+                  </span>
+                  <p
+                    className="font-mono text-[10px] truncate"
+                    style={{ color: "oklch(0.65 0.08 200 / 0.6)" }}
+                  >
+                    {replyingTo.text}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-ocid="chat.close_button"
+                  onClick={() => setReplyingTo(null)}
+                  className="flex-shrink-0 p-0.5 rounded-sm transition-all duration-200 hover:bg-neon-cyan/10"
+                  style={{ color: "oklch(0.82 0.2 196 / 0.4)" }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex items-end gap-3">
           <div
             className="flex-1 relative rounded-sm"
@@ -388,6 +773,7 @@ export function ChatScreen({
             userRank={userRank}
             onClose={() => setSidebarOpen(false)}
             actor={actor}
+            onMessagesRefresh={refreshMessages}
           />
         )}
       </AnimatePresence>
