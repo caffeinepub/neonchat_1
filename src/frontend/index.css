@@ -1,0 +1,333 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Geist Mono - monospace */
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* JetBrains Mono - monospace accent */
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono[wght].woff2") format("woff2");
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+/* Sora - body/UI */
+@font-face {
+  font-family: "Sora";
+  src: url("/assets/fonts/Sora[wght].woff2") format("woff2");
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+/* Mona Sans - display */
+@font-face {
+  font-family: "Mona Sans";
+  src: url("/assets/fonts/MonaSans[wdth,wght].woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.375rem;
+
+    /* Futuristic dark cyberpunk theme */
+    --background: 0.09 0.018 245;
+    --foreground: 0.92 0.04 200;
+    --card: 0.12 0.025 240;
+    --card-foreground: 0.92 0.04 200;
+    --popover: 0.11 0.022 242;
+    --popover-foreground: 0.92 0.04 200;
+    --primary: 0.78 0.18 196;
+    --primary-foreground: 0.06 0.02 245;
+    --secondary: 0.15 0.03 250;
+    --secondary-foreground: 0.85 0.08 200;
+    --muted: 0.14 0.025 245;
+    --muted-foreground: 0.55 0.07 210;
+    --accent: 0.72 0.22 310;
+    --accent-foreground: 0.06 0.02 245;
+    --destructive: 0.62 0.24 25;
+    --destructive-foreground: 0.98 0.01 200;
+    --border: 0.22 0.04 230;
+    --input: 0.18 0.035 235;
+    --ring: 0.78 0.18 196;
+
+    /* Neon colors */
+    --neon-cyan: 0.82 0.2 196;
+    --neon-magenta: 0.72 0.25 310;
+    --neon-blue: 0.65 0.22 260;
+    --neon-green: 0.78 0.2 145;
+    --deep-bg: 0.06 0.015 248;
+    --surface-1: 0.11 0.022 242;
+    --surface-2: 0.15 0.03 240;
+    --surface-3: 0.2 0.04 238;
+
+    --chart-1: 0.82 0.2 196;
+    --chart-2: 0.72 0.25 310;
+    --chart-3: 0.65 0.22 260;
+    --chart-4: 0.78 0.2 145;
+    --chart-5: 0.75 0.2 50;
+
+    --sidebar: 0.11 0.022 242;
+    --sidebar-foreground: 0.92 0.04 200;
+    --sidebar-primary: 0.78 0.18 196;
+    --sidebar-primary-foreground: 0.06 0.02 245;
+    --sidebar-accent: 0.15 0.03 250;
+    --sidebar-accent-foreground: 0.85 0.08 200;
+    --sidebar-border: 0.22 0.04 230;
+    --sidebar-ring: 0.78 0.18 196;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sora;
+    background-color: oklch(var(--deep-bg));
+    overflow: hidden;
+  }
+}
+
+/* Futuristic grid overlay */
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(oklch(0.82 0.2 196 / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.82 0.2 196 / 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Scanline effect */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    oklch(0 0 0 / 0.04) 2px,
+    oklch(0 0 0 / 0.04) 4px
+  );
+}
+
+/* Neon glow text effects */
+.neon-cyan {
+  color: oklch(var(--neon-cyan));
+  text-shadow:
+    0 0 10px oklch(var(--neon-cyan) / 0.8),
+    0 0 20px oklch(var(--neon-cyan) / 0.5),
+    0 0 40px oklch(var(--neon-cyan) / 0.3);
+}
+
+.neon-magenta {
+  color: oklch(var(--neon-magenta));
+  text-shadow:
+    0 0 10px oklch(var(--neon-magenta) / 0.8),
+    0 0 20px oklch(var(--neon-magenta) / 0.5),
+    0 0 40px oklch(var(--neon-magenta) / 0.3);
+}
+
+/* Neon border glow */
+.border-neon-cyan {
+  border-color: oklch(var(--neon-cyan) / 0.6);
+  box-shadow:
+    0 0 8px oklch(var(--neon-cyan) / 0.4),
+    inset 0 0 8px oklch(var(--neon-cyan) / 0.05);
+}
+
+.border-neon-magenta {
+  border-color: oklch(var(--neon-magenta) / 0.6);
+  box-shadow:
+    0 0 8px oklch(var(--neon-magenta) / 0.4),
+    inset 0 0 8px oklch(var(--neon-magenta) / 0.05);
+}
+
+/* Input focus neon glow */
+.neon-input:focus {
+  outline: none;
+  border-color: oklch(var(--neon-cyan) / 0.8);
+  box-shadow:
+    0 0 12px oklch(var(--neon-cyan) / 0.5),
+    0 0 24px oklch(var(--neon-cyan) / 0.2),
+    inset 0 0 8px oklch(var(--neon-cyan) / 0.05);
+}
+
+/* Code digit box */
+.code-digit {
+  width: 3.5rem;
+  height: 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  border: 1px solid oklch(var(--neon-cyan) / 0.3);
+  background: oklch(var(--surface-1));
+  color: oklch(var(--neon-cyan));
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.code-digit.active {
+  border-color: oklch(var(--neon-cyan) / 0.8);
+  box-shadow:
+    0 0 12px oklch(var(--neon-cyan) / 0.5),
+    0 0 24px oklch(var(--neon-cyan) / 0.2);
+}
+
+.code-digit.error {
+  border-color: oklch(0.62 0.24 25 / 0.8);
+  color: oklch(0.62 0.24 25);
+  box-shadow: 0 0 12px oklch(0.62 0.24 25 / 0.5);
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+
+@keyframes glitch {
+  0%, 100% { transform: translateX(0); clip-path: none; }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+}
+
+.glitch-text {
+  animation: glitch 0.4s ease;
+}
+
+/* Message slide-in */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-in {
+  animation: slideInUp 0.25s ease forwards;
+}
+
+/* Sidebar slide-in */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+/* Pulse dot for online indicator */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.pulse-dot {
+  animation: pulseDot 2s infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: oklch(var(--deep-bg));
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(var(--neon-cyan) / 0.3);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(var(--neon-cyan) / 0.5);
+}
+
+/* Typing indicator */
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
+
+.typing-dot:nth-child(1) { animation: typingBounce 1.2s infinite 0s; }
+.typing-dot:nth-child(2) { animation: typingBounce 1.2s infinite 0.2s; }
+.typing-dot:nth-child(3) { animation: typingBounce 1.2s infinite 0.4s; }
+
+/* Corner bracket decorations */
+.corner-brackets {
+  position: relative;
+}
+
+.corner-brackets::before,
+.corner-brackets::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: oklch(var(--neon-cyan) / 0.5);
+  border-style: solid;
+}
+
+.corner-brackets::before {
+  top: -2px;
+  left: -2px;
+  border-width: 2px 0 0 2px;
+}
+
+.corner-brackets::after {
+  bottom: -2px;
+  right: -2px;
+  border-width: 0 2px 2px 0;
+}
+
+/* Surface glass effect */
+.glass-surface {
+  background: oklch(var(--surface-1) / 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Blink cursor animation */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.cursor-blink::after {
+  content: "_";
+  animation: blink 1s step-end infinite;
+  color: oklch(var(--neon-cyan));
+}
