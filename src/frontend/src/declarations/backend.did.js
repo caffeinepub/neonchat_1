@@ -8,9 +8,15 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const Rank = IDL.Variant({
+  'Employee' : IDL.Null,
+  'Admin' : IDL.Null,
+  'Friend' : IDL.Null,
+});
 export const Message = IDL.Record({
   'id' : IDL.Nat,
   'userName' : IDL.Text,
+  'userRank' : IDL.Text,
   'userId' : IDL.Text,
   'text' : IDL.Text,
   'timestamp' : IDL.Int,
@@ -18,6 +24,7 @@ export const Message = IDL.Record({
 export const User = IDL.Record({
   'id' : IDL.Text,
   'name' : IDL.Text,
+  'rank' : Rank,
   'lastSeen' : IDL.Int,
 });
 export const http_header = IDL.Record({
@@ -41,9 +48,11 @@ export const TransformationOutput = IDL.Record({
 
 export const idlService = IDL.Service({
   'askAI' : IDL.Func([IDL.Text], [IDL.Text], []),
-  'getDMs' : IDL.Func([IDL.Text, IDL.Text], [IDL.Vec(Message)], []),
-  'getMessages' : IDL.Func([IDL.Int], [IDL.Vec(Message)], []),
-  'getUsers' : IDL.Func([], [IDL.Vec(User)], []),
+  'assignRank' : IDL.Func([IDL.Text, IDL.Text, Rank], [IDL.Bool], []),
+  'getDMs' : IDL.Func([IDL.Text, IDL.Text], [IDL.Vec(Message)], ['query']),
+  'getMessages' : IDL.Func([IDL.Int], [IDL.Vec(Message)], ['query']),
+  'getUserRank' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+  'getUsers' : IDL.Func([], [IDL.Vec(User)], ['query']),
   'registerUser' : IDL.Func([IDL.Text], [IDL.Text], []),
   'sendDM' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
   'sendMessage' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
@@ -59,9 +68,15 @@ export const idlService = IDL.Service({
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const Rank = IDL.Variant({
+    'Employee' : IDL.Null,
+    'Admin' : IDL.Null,
+    'Friend' : IDL.Null,
+  });
   const Message = IDL.Record({
     'id' : IDL.Nat,
     'userName' : IDL.Text,
+    'userRank' : IDL.Text,
     'userId' : IDL.Text,
     'text' : IDL.Text,
     'timestamp' : IDL.Int,
@@ -69,6 +84,7 @@ export const idlFactory = ({ IDL }) => {
   const User = IDL.Record({
     'id' : IDL.Text,
     'name' : IDL.Text,
+    'rank' : Rank,
     'lastSeen' : IDL.Int,
   });
   const http_header = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
@@ -89,9 +105,11 @@ export const idlFactory = ({ IDL }) => {
   
   return IDL.Service({
     'askAI' : IDL.Func([IDL.Text], [IDL.Text], []),
-    'getDMs' : IDL.Func([IDL.Text, IDL.Text], [IDL.Vec(Message)], []),
-    'getMessages' : IDL.Func([IDL.Int], [IDL.Vec(Message)], []),
-    'getUsers' : IDL.Func([], [IDL.Vec(User)], []),
+    'assignRank' : IDL.Func([IDL.Text, IDL.Text, Rank], [IDL.Bool], []),
+    'getDMs' : IDL.Func([IDL.Text, IDL.Text], [IDL.Vec(Message)], ['query']),
+    'getMessages' : IDL.Func([IDL.Int], [IDL.Vec(Message)], ['query']),
+    'getUserRank' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+    'getUsers' : IDL.Func([], [IDL.Vec(User)], ['query']),
     'registerUser' : IDL.Func([IDL.Text], [IDL.Text], []),
     'sendDM' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
     'sendMessage' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),

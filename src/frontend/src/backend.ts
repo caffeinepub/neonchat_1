@@ -89,7 +89,7 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface http_request_result {
+export interface TransformationOutput {
     status: bigint;
     body: Uint8Array;
     headers: Array<http_header>;
@@ -98,31 +98,40 @@ export interface TransformationInput {
     context: Uint8Array;
     response: http_request_result;
 }
-export interface Message {
-    id: bigint;
-    userName: string;
-    userId: string;
-    text: string;
-    timestamp: bigint;
-}
-export interface TransformationOutput {
-    status: bigint;
-    body: Uint8Array;
-    headers: Array<http_header>;
-}
 export interface User {
     id: string;
     name: string;
+    rank: Rank;
     lastSeen: bigint;
+}
+export interface Message {
+    id: bigint;
+    userName: string;
+    userRank: string;
+    userId: string;
+    text: string;
+    timestamp: bigint;
 }
 export interface http_header {
     value: string;
     name: string;
 }
+export interface http_request_result {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
+}
+export enum Rank {
+    Employee = "Employee",
+    Admin = "Admin",
+    Friend = "Friend"
+}
 export interface backendInterface {
     askAI(prompt: string): Promise<string>;
-    getDMs(userId: string, otherUserId: string): Promise<Array<Message>>;
+    assignRank(adminUserId: string, targetUserId: string, rank: Rank): Promise<boolean>;
+    getDMs(userId: string, _otherUserId: string): Promise<Array<Message>>;
     getMessages(since: bigint): Promise<Array<Message>>;
+    getUserRank(userId: string): Promise<string>;
     getUsers(): Promise<Array<User>>;
     registerUser(name: string): Promise<string>;
     sendDM(fromUserId: string, toUserId: string, text: string): Promise<bigint>;
@@ -131,6 +140,7 @@ export interface backendInterface {
     updateLastSeen(userId: string): Promise<void>;
     verifyCode(code: string): Promise<boolean>;
 }
+import type { Rank as _Rank, User as _User } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async askAI(arg0: string): Promise<string> {
@@ -144,6 +154,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.askAI(arg0);
+            return result;
+        }
+    }
+    async assignRank(arg0: string, arg1: string, arg2: Rank): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.assignRank(arg0, arg1, to_candid_Rank_n1(this._uploadFile, this._downloadFile, arg2));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.assignRank(arg0, arg1, to_candid_Rank_n1(this._uploadFile, this._downloadFile, arg2));
             return result;
         }
     }
@@ -175,18 +199,32 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getUsers(): Promise<Array<User>> {
+    async getUserRank(arg0: string): Promise<string> {
         if (this.processError) {
             try {
-                const result = await this.actor.getUsers();
+                const result = await this.actor.getUserRank(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getUsers();
+            const result = await this.actor.getUserRank(arg0);
             return result;
+        }
+    }
+    async getUsers(): Promise<Array<User>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getUsers();
+                return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getUsers();
+            return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
         }
     }
     async registerUser(arg0: string): Promise<string> {
@@ -273,6 +311,60 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+}
+function from_candid_Rank_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Rank): Rank {
+    return from_candid_variant_n7(_uploadFile, _downloadFile, value);
+}
+function from_candid_User_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _User): User {
+    return from_candid_record_n5(_uploadFile, _downloadFile, value);
+}
+function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: string;
+    name: string;
+    rank: _Rank;
+    lastSeen: bigint;
+}): {
+    id: string;
+    name: string;
+    rank: Rank;
+    lastSeen: bigint;
+} {
+    return {
+        id: value.id,
+        name: value.name,
+        rank: from_candid_Rank_n6(_uploadFile, _downloadFile, value.rank),
+        lastSeen: value.lastSeen
+    };
+}
+function from_candid_variant_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    Employee: null;
+} | {
+    Admin: null;
+} | {
+    Friend: null;
+}): Rank {
+    return "Employee" in value ? Rank.Employee : "Admin" in value ? Rank.Admin : "Friend" in value ? Rank.Friend : value;
+}
+function from_candid_vec_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_User>): Array<User> {
+    return value.map((x)=>from_candid_User_n4(_uploadFile, _downloadFile, x));
+}
+function to_candid_Rank_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Rank): _Rank {
+    return to_candid_variant_n2(_uploadFile, _downloadFile, value);
+}
+function to_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Rank): {
+    Employee: null;
+} | {
+    Admin: null;
+} | {
+    Friend: null;
+} {
+    return value == Rank.Employee ? {
+        Employee: null
+    } : value == Rank.Admin ? {
+        Admin: null
+    } : value == Rank.Friend ? {
+        Friend: null
+    } : value;
 }
 export interface CreateActorOptions {
     agent?: Agent;

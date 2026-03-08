@@ -1,40 +1,43 @@
 # NeonChat
 
 ## Current State
-New project. No existing backend or frontend code.
+
+NeonChat is a futuristic chat app with:
+- Code gate entry (code: 1017)
+- Username picker
+- Global chat with real-time polling
+- Slide-out sidebar with AI assistant and DM panel
+- Users stored with id, name, lastSeen fields
+- Messages stored with id, userId, userName, text, timestamp
 
 ## Requested Changes (Diff)
 
 ### Add
-- Access gate: a fullscreen code entry screen that accepts a 4-digit passcode (1017). Incorrect codes show an error; correct code unlocks the chat.
-- Name selection screen: after correct code, user picks a display name before entering chat.
-- Global chat room: a real-time public chat where all users can send and receive messages. Messages are stored on-chain and polled frequently for live updates.
-- Futuristic UI theme: dark background, neon/glowing accents, monospace or sci-fi fonts, grid/scanline aesthetics.
-- Sleek pop-out sidebar (slides in from the right or left) containing:
-  - AI Chat button: opens an AI assistant panel where the user can ask questions and receive responses (powered by HTTP outcalls to an AI API).
-  - Personal DM button: opens a direct message interface to select a user and send private messages.
-- DM system: users can see a list of online/known users and open a private conversation thread with any of them.
-- AI panel: sends messages to an AI endpoint and displays responses inline.
+- Rank system with 3 tiers: Admin (top), Employee (middle), Friend (bottom)
+- Auto-assign Admin rank to any user registering with the name "NEXUS"
+- New backend functions: `getUserRank`, `assignRank` (admin-only), `getRanks` (returns all user ranks)
+- Rank label displayed next to username in global chat messages
+- Rank label displayed next to username in DM user list and DM conversation headers
+- Admin users can assign ranks to other users via a UI control in the sidebar/DM panel
 
 ### Modify
-- N/A (new project)
+- `User` type gains a `rank` field: `#Admin | #Employee | #Friend`
+- `registerUser` sets default rank to Friend, except "NEXUS" gets Admin
+- `getUsers` returns users with rank included
+- Messages should include the sender's rank so it can be displayed inline
 
 ### Remove
-- N/A (new project)
+- Nothing removed
 
 ## Implementation Plan
-1. Backend (Motoko):
-   - Store access code constant (1017)
-   - verifyCode(code: Text) -> Bool
-   - User registry: registerUser(name: Text) -> UserId, getUsers() -> [User]
-   - Global chat: sendMessage(userId, text) -> MessageId, getMessages(since: Timestamp) -> [Message]
-   - DM system: sendDM(fromId, toId, text) -> (), getDMs(userId, otherId) -> [Message]
-   - AI outcall: askAI(prompt: Text) -> Text (HTTP outcall to external AI API)
 
-2. Frontend:
-   - Code entry screen with futuristic styling and input validation
-   - Name picker screen
-   - Main chat layout: message feed + input bar
-   - Sidebar (pop-out): AI panel + DM panel with user list and conversation view
-   - Polling mechanism (~1s interval) to keep messages live
-   - Deterministic data-ocid markers on all interactive elements
+1. Update `User` type in Motoko to include a `rank` variant field
+2. Add rank variant type: `#Admin`, `#Employee`, `#Friend`
+3. Update `registerUser` to auto-assign Admin to "NEXUS", Friend to all others
+4. Add `assignRank(adminUserId, targetUserId, rank)` -- only works if caller is Admin
+5. Add `getUserRank(userId)` query
+6. Update `Message` type to include `userRank` field so messages display rank inline
+7. Update `sendMessage` and `sendDM` to embed current rank in message
+8. Frontend: Display rank badge next to username in chat messages (color-coded: Admin=gold, Employee=cyan, Friend=gray)
+9. Frontend: Display rank badge in DM user list
+10. Frontend: Admin users see a rank assignment control when viewing other users in the DM panel

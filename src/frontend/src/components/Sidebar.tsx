@@ -1,15 +1,18 @@
-import type { backendInterface } from "@/backend";
+import type { Rank, backendInterface } from "@/backend";
 import {
   Bot,
+  ChevronDown,
   ChevronLeft,
   Loader2,
   MessageCircle,
   Send,
+  Shield,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { RankBadge } from "./RankBadge";
 
 type SidebarView = "menu" | "ai" | "dm";
 type DMView = "list" | "thread";
@@ -17,6 +20,7 @@ type DMView = "list" | "thread";
 interface User {
   id: string;
   name: string;
+  rank: Rank;
   lastSeen: bigint;
 }
 
@@ -37,9 +41,16 @@ interface AIMessage {
 interface SidebarProps {
   userId: string;
   userName: string;
+  userRank: string;
   onClose: () => void;
   actor: backendInterface | null;
 }
+
+const RANK_OPTIONS: { value: Rank; label: string }[] = [
+  { value: "Admin" as Rank, label: "Admin" },
+  { value: "Employee" as Rank, label: "Employee" },
+  { value: "Friend" as Rank, label: "Friend" },
+];
 
 function formatTime(timestamp: bigint): string {
   const date = new Date(Number(timestamp) / 1_000_000);
@@ -55,7 +66,13 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function Sidebar({ userId, userName, onClose, actor }: SidebarProps) {
+export function Sidebar({
+  userId,
+  userName,
+  userRank,
+  onClose,
+  actor,
+}: SidebarProps) {
   const [view, setView] = useState<SidebarView>("menu");
   const [dmView, setDMView] = useState<DMView>("list");
   const [users, setUsers] = useState<User[]>([]);
@@ -66,9 +83,13 @@ export function Sidebar({ userId, userName, onClose, actor }: SidebarProps) {
   const [aiMessages, setAIMessages] = useState<AIMessage[]>([]);
   const [aiInput, setAIInput] = useState("");
   const [isAILoading, setIsAILoading] = useState(false);
+  const [assigningFor, setAssigningFor] = useState<string | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
   const aiMsgCounter = useRef(0);
   const dmEndRef = useRef<HTMLDivElement>(null);
   const aiEndRef = useRef<HTMLDivElement>(null);
+
+  const isAdmin = userRank === "Admin";
 
   // Scroll to bottom on new messages
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll triggered by message list change
@@ -168,6 +189,27 @@ export function Sidebar({ userId, userName, onClose, actor }: SidebarProps) {
   const handleBackToList = () => {
     setDMView("list");
     setSelectedUser(null);
+  };
+
+  const handleAssignRank = async (targetUserId: string, newRank: Rank) => {
+    if (!actor || !isAdmin || isAssigning) return;
+    setIsAssigning(true);
+    setAssigningFor(null);
+    try {
+      const success = await actor.assignRank(userId, targetUserId, newRank);
+      if (success) {
+        toast.success(`Rank updated to ${newRank}`);
+        // Refresh user list to reflect rank change
+        const list = await actor.getUsers();
+        setUsers(list.filter((u) => u.id !== userId));
+      } else {
+        toast.error("Failed to assign rank");
+      }
+    } catch {
+      toast.error("Error assigning rank");
+    } finally {
+      setIsAssigning(false);
+    }
   };
 
   const sidebarBg = "oklch(0.10 0.02 242)";
@@ -344,9 +386,9 @@ export function Sidebar({ userId, userName, onClose, actor }: SidebarProps) {
                   border: "1px solid oklch(0.22 0.04 230 / 0.5)",
                 }}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <div
-                    className="w-2 h-2 rounded-full pulse-dot"
+                    className="w-2 h-2 rounded-full pulse-dot flex-shrink-0"
                     style={{ background: "oklch(0.78 0.2 145)" }}
                   />
                   <span className="text-neon-cyan/40">
@@ -355,7 +397,19 @@ export function Sidebar({ userId, userName, onClose, actor }: SidebarProps) {
                       {userName}
                     </span>
                   </span>
+                  {userRank && <RankBadge rank={userRank} />}
                 </div>
+                {isAdmin && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <Shield
+                      className="w-3 h-3"
+                      style={{ color: "oklch(0.85 0.19 80 / 0.7)" }}
+                    />
+                    <span style={{ color: "oklch(0.85 0.19 80 / 0.7)" }}>
+                      Admin privileges active
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -509,41 +563,125 @@ export function Sidebar({ userId, userName, onClose, actor }: SidebarProps) {
               <div data-ocid="dm.list" className="space-y-2">
                 {users.map((user, i) => {
                   const ocid = i < 10 ? `dm.item.${i + 1}` : undefined;
+                  const isDropdownOpen = assigningFor === user.id;
                   return (
-                    <button
-                      type="button"
+                    <div
                       key={user.id}
                       data-ocid={ocid}
-                      onClick={() => handleSelectUser(user)}
-                      className="w-full flex items-center gap-3 p-3 rounded-sm transition-all duration-200 text-left group"
+                      className="rounded-sm"
                       style={{
                         background: "oklch(0.13 0.025 242)",
                         border: "1px solid oklch(0.72 0.25 310 / 0.12)",
                       }}
                     >
-                      <div
-                        className="w-8 h-8 rounded-sm flex-shrink-0 flex items-center justify-center font-mono text-xs font-bold transition-transform duration-200 group-hover:scale-105"
-                        style={{
-                          background: "oklch(0.72 0.25 310 / 0.15)",
-                          border: "1px solid oklch(0.72 0.25 310 / 0.3)",
-                          color: "oklch(0.72 0.25 310)",
-                        }}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectUser(user)}
+                        className="w-full flex items-center gap-3 p-3 rounded-sm transition-all duration-200 text-left group"
                       >
-                        {getInitials(user.name)}
-                      </div>
-                      <div className="flex-1 min-w-0">
                         <div
-                          className="font-mono text-sm truncate"
-                          style={{ color: "oklch(0.88 0.04 200)" }}
+                          className="w-8 h-8 rounded-sm flex-shrink-0 flex items-center justify-center font-mono text-xs font-bold transition-transform duration-200 group-hover:scale-105"
+                          style={{
+                            background: "oklch(0.72 0.25 310 / 0.15)",
+                            border: "1px solid oklch(0.72 0.25 310 / 0.3)",
+                            color: "oklch(0.72 0.25 310)",
+                          }}
                         >
-                          {user.name}
+                          {getInitials(user.name)}
                         </div>
-                      </div>
-                      <MessageCircle
-                        className="w-3.5 h-3.5 flex-shrink-0 opacity-30 group-hover:opacity-70 transition-opacity"
-                        style={{ color: "oklch(0.72 0.25 310)" }}
-                      />
-                    </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className="font-mono text-sm truncate"
+                              style={{ color: "oklch(0.88 0.04 200)" }}
+                            >
+                              {user.name}
+                            </span>
+                            <RankBadge rank={user.rank as string} />
+                          </div>
+                        </div>
+                        <MessageCircle
+                          className="w-3.5 h-3.5 flex-shrink-0 opacity-30 group-hover:opacity-70 transition-opacity"
+                          style={{ color: "oklch(0.72 0.25 310)" }}
+                        />
+                      </button>
+
+                      {/* Admin rank assignment controls */}
+                      {isAdmin && (
+                        // biome-ignore lint/a11y/useKeyWithClickEvents: click stops propagation only, no interactive content here
+                        <div
+                          className="px-3 pb-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {!isDropdownOpen ? (
+                            <button
+                              type="button"
+                              data-ocid={
+                                i < 10 ? `dm.edit_button.${i + 1}` : undefined
+                              }
+                              onClick={() => setAssigningFor(user.id)}
+                              disabled={isAssigning}
+                              className="flex items-center gap-1 font-mono text-xs transition-opacity duration-200 hover:opacity-80 disabled:opacity-30"
+                              style={{ color: "oklch(0.85 0.19 80 / 0.6)" }}
+                            >
+                              <Shield className="w-2.5 h-2.5" />
+                              <span>Assign rank</span>
+                              <ChevronDown className="w-2.5 h-2.5" />
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {RANK_OPTIONS.map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  data-ocid={`rank.${opt.value.toLowerCase()}.button`}
+                                  onClick={() =>
+                                    handleAssignRank(user.id, opt.value)
+                                  }
+                                  disabled={isAssigning}
+                                  className="font-mono text-xs px-2 py-0.5 rounded-sm transition-all duration-150 disabled:opacity-30"
+                                  style={{
+                                    background:
+                                      opt.value === "Admin"
+                                        ? "oklch(0.85 0.19 80 / 0.12)"
+                                        : opt.value === "Employee"
+                                          ? "oklch(0.82 0.2 196 / 0.1)"
+                                          : "oklch(0.65 0.05 230 / 0.08)",
+                                    border:
+                                      opt.value === "Admin"
+                                        ? "1px solid oklch(0.85 0.19 80 / 0.35)"
+                                        : opt.value === "Employee"
+                                          ? "1px solid oklch(0.82 0.2 196 / 0.3)"
+                                          : "1px solid oklch(0.65 0.05 230 / 0.2)",
+                                    color:
+                                      opt.value === "Admin"
+                                        ? "oklch(0.85 0.19 80)"
+                                        : opt.value === "Employee"
+                                          ? "oklch(0.82 0.2 196)"
+                                          : "oklch(0.65 0.05 230)",
+                                  }}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                data-ocid="rank.assign.cancel_button"
+                                onClick={() => setAssigningFor(null)}
+                                className="font-mono text-xs px-2 py-0.5 rounded-sm transition-all duration-150"
+                                style={{
+                                  color: "oklch(0.55 0.07 210 / 0.6)",
+                                  border:
+                                    "1px solid oklch(0.55 0.07 210 / 0.15)",
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>

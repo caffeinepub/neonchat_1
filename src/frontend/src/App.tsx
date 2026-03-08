@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
+import { useActor } from "@/hooks/useActor";
 import { useEffect, useState } from "react";
 import { ChatScreen } from "./components/ChatScreen";
 import { CodeGateScreen } from "./components/CodeGateScreen";
@@ -10,17 +11,33 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("code");
   const [userId, setUserId] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
+  const [userRank, setUserRank] = useState<string>("Friend");
+  const { actor } = useActor();
 
   // Restore session from sessionStorage
   useEffect(() => {
     const storedId = sessionStorage.getItem("userId");
     const storedName = sessionStorage.getItem("userName");
+    const storedRank = sessionStorage.getItem("userRank");
     if (storedId && storedName) {
       setUserId(storedId);
       setUserName(storedName);
+      setUserRank(storedRank ?? "Friend");
       setScreen("chat");
     }
   }, []);
+
+  // Fetch rank from backend when actor is ready and user is logged in
+  useEffect(() => {
+    if (!actor || !userId) return;
+    actor
+      .getUserRank(userId)
+      .then((rank) => {
+        setUserRank(rank);
+        sessionStorage.setItem("userRank", rank);
+      })
+      .catch(() => {});
+  }, [actor, userId]);
 
   const handleCodeAccepted = () => {
     setScreen("name");
@@ -29,16 +46,22 @@ export default function App() {
   const handleNameConfirmed = (id: string, name: string) => {
     setUserId(id);
     setUserName(name);
+    // NEXUS auto-gets Admin; others start as Friend until backend confirms
+    const initialRank = name === "NEXUS" ? "Admin" : "Friend";
+    setUserRank(initialRank);
     sessionStorage.setItem("userId", id);
     sessionStorage.setItem("userName", name);
+    sessionStorage.setItem("userRank", initialRank);
     setScreen("chat");
   };
 
   const handleLogout = () => {
     sessionStorage.removeItem("userId");
     sessionStorage.removeItem("userName");
+    sessionStorage.removeItem("userRank");
     setUserId("");
     setUserName("");
+    setUserRank("Friend");
     setScreen("code");
   };
 
@@ -60,6 +83,7 @@ export default function App() {
         <ChatScreen
           userId={userId}
           userName={userName}
+          userRank={userRank}
           onLogout={handleLogout}
         />
       )}

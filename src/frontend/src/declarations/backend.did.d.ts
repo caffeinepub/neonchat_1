@@ -13,10 +13,14 @@ import type { Principal } from '@icp-sdk/core/principal';
 export interface Message {
   'id' : bigint,
   'userName' : string,
+  'userRank' : string,
   'userId' : string,
   'text' : string,
   'timestamp' : bigint,
 }
+export type Rank = { 'Employee' : null } |
+  { 'Admin' : null } |
+  { 'Friend' : null };
 export interface TransformationInput {
   'context' : Uint8Array,
   'response' : http_request_result,
@@ -26,7 +30,12 @@ export interface TransformationOutput {
   'body' : Uint8Array,
   'headers' : Array<http_header>,
 }
-export interface User { 'id' : string, 'name' : string, 'lastSeen' : bigint }
+export interface User {
+  'id' : string,
+  'name' : string,
+  'rank' : Rank,
+  'lastSeen' : bigint,
+}
 export interface http_header { 'value' : string, 'name' : string }
 export interface http_request_result {
   'status' : bigint,
@@ -35,8 +44,10 @@ export interface http_request_result {
 }
 export interface _SERVICE {
   'askAI' : ActorMethod<[string], string>,
+  'assignRank' : ActorMethod<[string, string, Rank], boolean>,
   'getDMs' : ActorMethod<[string, string], Array<Message>>,
   'getMessages' : ActorMethod<[bigint], Array<Message>>,
+  'getUserRank' : ActorMethod<[string], string>,
   'getUsers' : ActorMethod<[], Array<User>>,
   'registerUser' : ActorMethod<[string], string>,
   'sendDM' : ActorMethod<[string, string, string], bigint>,

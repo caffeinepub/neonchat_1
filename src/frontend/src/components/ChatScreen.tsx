@@ -3,12 +3,14 @@ import { LogOut, Radio, Send } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { RankBadge } from "./RankBadge";
 import { Sidebar } from "./Sidebar";
 
 interface Message {
   id: bigint;
   userId: string;
   userName: string;
+  userRank: string;
   text: string;
   timestamp: bigint;
 }
@@ -16,6 +18,7 @@ interface Message {
 interface ChatScreenProps {
   userId: string;
   userName: string;
+  userRank: string;
   onLogout: () => void;
 }
 
@@ -24,7 +27,12 @@ function formatTime(timestamp: bigint): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export function ChatScreen({ userId, userName, onLogout }: ChatScreenProps) {
+export function ChatScreen({
+  userId,
+  userName,
+  userRank,
+  onLogout,
+}: ChatScreenProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -171,6 +179,11 @@ export function ChatScreen({ userId, userName, onLogout }: ChatScreenProps) {
             >
               {userName}
             </span>
+            {userRank && (
+              <span className="hidden sm:inline-flex">
+                <RankBadge rank={userRank} />
+              </span>
+            )}
           </div>
 
           {/* Logout */}
@@ -230,9 +243,9 @@ export function ChatScreen({ userId, userName, onLogout }: ChatScreenProps) {
                 <div
                   className={`flex flex-col gap-1 max-w-[70%] ${own ? "items-end" : "items-start"}`}
                 >
-                  {/* Name + time */}
+                  {/* Name + rank + time */}
                   <div
-                    className={`flex items-center gap-2 ${own ? "flex-row-reverse" : "flex-row"}`}
+                    className={`flex items-center gap-1.5 flex-wrap ${own ? "flex-row-reverse" : "flex-row"}`}
                   >
                     <span
                       className="font-mono text-xs font-semibold"
@@ -244,6 +257,7 @@ export function ChatScreen({ userId, userName, onLogout }: ChatScreenProps) {
                     >
                       {own ? "YOU" : msg.userName}
                     </span>
+                    {msg.userRank && <RankBadge rank={msg.userRank} />}
                     <span
                       className="font-mono text-xs"
                       style={{ color: "oklch(0.55 0.07 210 / 0.6)" }}
@@ -371,6 +385,7 @@ export function ChatScreen({ userId, userName, onLogout }: ChatScreenProps) {
           <Sidebar
             userId={userId}
             userName={userName}
+            userRank={userRank}
             onClose={() => setSidebarOpen(false)}
             actor={actor}
           />
