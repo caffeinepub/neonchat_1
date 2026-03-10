@@ -10,9 +10,9 @@ import Iter "mo:core/Iter";
 import Runtime "mo:core/Runtime";
 
 import OutCall "http-outcalls/outcall";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   type Rank = {
     #Admin;
@@ -73,6 +73,10 @@ actor {
   var nextUserId = 0;
 
   let users = Map.empty<Text, User>();
+  // Maps username -> current active userId (for rank persistence + duplicate kick)
+  let nameToUserId = Map.empty<Text, Text>();
+  // Set of userId values that have been superseded by a new login of the same name
+  let kickedUserIds = Map.empty<Text, Bool>();
   let publicMessages = List.empty<Message>();
   let directMessages = Map.empty<Text, List.List<Message>>();
   let bans = Map.empty<Text, BanRecord>();
@@ -107,13 +111,31 @@ actor {
 
   public shared ({ caller }) func registerUser(name : Text) : async Text {
     let userId = generateUserId();
+
+    // Determine rank: inherit from previous session if name has logged in before
+    // Read rank BEFORE removing the old user record
+    let inheritedRank : Rank = switch (nameToUserId.get(name)) {
+      case (null) { #Friend };
+      case (?oldUserId) {
+        let rank = switch (users.get(oldUserId)) {
+          case (null) { #Friend };
+          case (?oldUser) { oldUser.rank };
+        };
+        // Now kick the old session
+        users.remove(oldUserId);
+        kickedUserIds.add(oldUserId, true);
+        rank;
+      };
+    };
+
     let user : User = {
       id = userId;
       name;
       lastSeen = Time.now();
-      rank = #Friend;
+      rank = inheritedRank;
     };
     users.add(userId, user);
+    nameToUserId.add(name, userId);
     userId;
   };
 
@@ -444,18 +466,22 @@ actor {
     };
   };
 
-  // NEW FEATURES
+  // KICK USER - remove from active users; they can rejoin
   public shared ({ caller }) func kickUser(adminUserId : Text, targetUserId : Text) : async Bool {
     switch (users.get(adminUserId)) {
       case (null) { false };
       case (?adminUser) {
         switch (adminUser.rank) {
           case (#Admin) {
-            if (users.containsKey(targetUserId)) {
-              users.remove(targetUserId);
-              return true;
-            } else {
-              return false;
+            switch (users.get(targetUserId)) {
+              case (null) { false };
+              case (?targetUser) {
+                users.remove(targetUserId);
+                kickedUserIds.add(targetUserId, true);
+                // Also clear name mapping so rejoin creates fresh session
+                nameToUserId.remove(targetUser.name);
+                true;
+              };
             };
           };
           case (_) { false };
@@ -465,6 +491,7 @@ actor {
   };
 
   public query ({ caller }) func isKicked(userId : Text) : async Bool {
-    not users.containsKey(userId);
+    // Kicked if removed from active users OR explicitly in kickedUserIds set
+    (not users.containsKey(userId)) or kickedUserIds.containsKey(userId);
   };
 };
